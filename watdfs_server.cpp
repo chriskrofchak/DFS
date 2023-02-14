@@ -2,11 +2,12 @@
 // Starter code for CS 454/654
 // You SHOULD change this file
 //
-
+#include "watdfs_make_args.h"
 #include "rpc.h"
 #include "debug.h"
 INIT_LOG
 
+#include <fuse.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -18,6 +19,19 @@ INIT_LOG
 // Global state server_persist_dir.
 char *server_persist_dir = nullptr;
 std::mutex persist_mut{};
+
+#define PROLOGUE                                   \
+    char *short_path = (char *)args[0];            \
+    char *full_path  = get_full_path(short_path)
+
+#define SETUP_SERVER_ARG(__ARG_COUNT) \
+    MAKE_ARG_TYPES(__ARG_COUNT); SETUP_ARG_TYPES(__ARG_COUNT, "1") 
+
+#define EPILOGUE(ret) free(full_path); DLOG("Returning code: %d", *ret)
+
+#define RPC_REG(fn_string, fn_name) rpcRegister((char *)fn_string, arg_types, fn_name)
+
+#define UPDATE_RET if (sys_ret < 0) *ret = -errno
 
 // Important: the server needs to handle multiple concurrent client requests.
 // You have to be carefuly in handling global variables, esp. for updating them.
@@ -87,21 +101,65 @@ int watdfs_getattr(int *argTypes, void **args) {
 }
 
 int watdfs_mknod(int *argTypes, void **args) {
-    (void)argTypes;
-    (void)args;
-    return -ENOSYS;
+    PROLOGUE;
+
+    // args[1] is mode
+    mode_t *mode = (mode_t *)args[1];
+
+    // args[2] is dev
+    dev_t *dev = (dev_t *)args[2];
+
+    // args[3] is retcode
+    int *ret = (int *)args[3];
+
+    // actual syscall
+    int sys_ret = mknod(full_path, *mode, *dev);
+
+    UPDATE_RET;
+
+    EPILOGUE(ret);
+    return 0;
 }
 
 int watdfs_open(int *argTypes, void **args) {
-    (void)argTypes;
-    (void)args;
-    return -ENOSYS;
+    PROLOGUE;
+
+    // args[1] is fi
+    struct fuse_file_info *fi = (struct fuse_file_info *)args[1];
+
+    // args[3] is retcode
+    int *ret = (int *)args[2];
+    *ret = 0;
+
+    // actual syscall
+    int fd = open(full_path, fi->flags);
+
+    if (fd < 0) *ret = -errno;
+
+    // else, fill in file descriptor to fi
+    fi->fh = fd;
+
+    EPILOGUE(ret);
+    return 0;
 }
 
 int watdfs_release(int *argTypes, void **args) {
-    (void)argTypes;
-    (void)args;
-    return -ENOSYS;
+    PROLOGUE;
+
+    // args[1] is fi
+    struct fuse_file_info *fi = (struct fuse_file_info *)args[1];
+
+    // args[3] is retcode
+    int *ret = (int *)args[2];
+    *ret = 0;
+
+    // actual syscall
+    int sys_ret = close(fi->fh);
+
+    UPDATE_RET;
+
+    EPILOGUE(ret);
+    return 0;
 }
 
 // The main function of the server.
@@ -158,6 +216,45 @@ int main(int argc, char *argv[]) {
             // It may be useful to have debug-printing here.
             return ret;
         }
+    }
+
+    // mknod
+    {
+        SETUP_SERVER_ARG(4);
+        
+        // mode
+        arg_types[1] = encode_arg_type(true, false, false, ARG_INT, 0);
+        // dev
+        arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
+
+        // rpc register
+        ret = RPC_REG("mknod", watdfs_mknod);
+
+        if (ret < 0) return ret;
+    }
+
+    // open
+    {
+        SETUP_SERVER_ARG(3);
+
+        // fi
+        arg_types[1] = encode_arg_type(true, true, true, ARG_CHAR, sizeof(struct fuse_file_info));
+
+        ret = RPC_REG("open", watdfs_open);
+
+        if (ret < 0) return ret;
+    }
+
+    // release
+    {
+        SETUP_SERVER_ARG(3);
+        
+        // fi
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, sizeof(struct fuse_file_info));
+
+        ret = RPC_REG("release", watdfs_release);
+
+        if (ret < 0) return ret;
     }
 
     // TODO: Hand over control to the RPC library by calling `rpcExecute`.

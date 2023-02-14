@@ -4,6 +4,7 @@
 //
 
 #include "watdfs_client.h"
+#include "watdfs_make_args.h"
 #include "debug.h"
 INIT_LOG
 
@@ -19,15 +20,11 @@ INIT_LOG
 // and [ARG_COUNT - 1] to retcode
 // and null terminates arg_types
 ////////////////////////
-#define MAKE_ARGS(__ARG_COUNT, __PATH)              \
-    void **args = new void*[__ARG_COUNT];           \
-    int arg_types[__ARG_COUNT+1];                   \
-    arg_types[0] = encode_arg_path(__PATH);         \
-    args[0] = (void *)__PATH;                       \
-    int retcode = 0;                                \
-    arg_types[__ARG_COUNT-1] = encode_retcode();    \
-    args[__ARG_COUNT-1] = (void*)&retcode;          \
-    arg_types[__ARG_COUNT] = 0
+
+#define MAKE_CLIENT_ARGS(_ARG_COUNT, _PATH) \
+    MAKE_ARGS(_ARG_COUNT, _PATH);           \
+    MAKE_ARG_TYPES(_ARG_COUNT);             \
+    SETUP_ARG_TYPES(_ARG_COUNT, _PATH) 
 
 #define VOIDIFY(element) (void *)element
 
@@ -80,22 +77,6 @@ void watdfs_cli_destroy(void *userdata) {
     // TODO: tear down the RPC library by calling `rpcClientDestroy`.
     int rpc_destroy_ret = rpcClientDestroy();
     (void)rpc_destroy_ret; // TODO... what to do with rpc_destroy_ret
-}
-
-int encode_arg_path(const char* path) {
-    (1u << ARG_INPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) | (uint)strlen(path);
-}
-
-int encode_retcode() {
-    return (1u << ARG_OUTPUT) | (ARG_INT << 16u);
-}
-
-int encode_arg_type(bool is_input, bool is_output, bool is_array, int type, int arr_size) {
-    return ((uint)is_input << ARG_INPUT)   | 
-           ((uint)is_output << ARG_OUTPUT) |
-           ((uint)is_array << ARG_ARRAY)   |
-           (uint)(type << 16u)             | 
-           (uint)arr_size;
 }
 
 // GET FILE ATTRIBUTES
@@ -186,7 +167,7 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     // Called to create a file.
 
     // boilerplate
-    MAKE_ARGS(4, path);
+    MAKE_CLIENT_ARGS(4, path);
 
     // mode
     arg_types[1] = encode_arg_type(true, false, false, ARG_INT, 0);
@@ -202,6 +183,10 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
 
     if (rpc_ret < 0) {
         // handle errors
+        DLOG("mknod rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
     } else {
         // fine!
         fxn_ret = rpc_ret;
@@ -215,13 +200,59 @@ int watdfs_cli_open(void *userdata, const char *path,
                     struct fuse_file_info *fi) {
     // Called during open.
     // You should fill in fi->fh.
-    return -ENOSYS;
+    MAKE_CLIENT_ARGS(3, path);
+
+    // fi arg
+    arg_types[1] = encode_arg_type(true, true, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
+    args[1] = VOIDIFY(fi);
+
+    int rpc_ret = RPCIFY("open");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        DLOG("open rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        // fine!
+        fxn_ret = rpc_ret;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
 
 int watdfs_cli_release(void *userdata, const char *path,
                        struct fuse_file_info *fi) {
     // Called during close, but possibly asynchronously.
-    return -ENOSYS;
+    // Called during open.
+    // You should fill in fi->fh.
+    MAKE_CLIENT_ARGS(3, path);
+
+    // fi arg
+    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
+    args[1] = VOIDIFY(fi);
+
+    int rpc_ret = RPCIFY("release");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        DLOG("release rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        // fine!
+        fxn_ret = rpc_ret;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
 
 // READ AND WRITE DATA
