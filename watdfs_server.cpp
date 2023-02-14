@@ -5,6 +5,7 @@
 #include "watdfs_make_args.h"
 #include "rpc.h"
 #include "debug.h"
+
 INIT_LOG
 
 #include <fuse.h>
@@ -221,7 +222,7 @@ int main(int argc, char *argv[]) {
     // mknod
     {
         SETUP_SERVER_ARG(4);
-        
+
         // mode
         arg_types[1] = encode_arg_type(true, false, false, ARG_INT, 0);
         // dev

@@ -43,7 +43,7 @@ all: libwatdfs.a watdfs_server watdfs_client
 
 # This compiles object files, by default it looks for .c files
 # so you may want to change this depending on your file naming scheme.
-%.o: %.c
+%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $(LDFLAGS) -L. -lrpc $<
 
 # Make the client library.
