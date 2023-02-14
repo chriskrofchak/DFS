@@ -145,7 +145,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
         // should set our function return value to the retcode from the server.
 
         // TODO: set the function return value to the return code from the server.
-        fxn_ret = rpc_ret;
+        fxn_ret = retcode;
     }
 
     if (fxn_ret < 0) {

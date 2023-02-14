@@ -85,7 +85,7 @@ int watdfs_getattr(int *argTypes, void **args) {
     // TODO: Make the stat system call, which is the corresponding system call needed
     // to support getattr. You should use the statbuf as an argument to the stat system call.
     // (void)statbuf;
-    sys_ret = stat(short_path, statbuf);
+    sys_ret = stat(full_path, statbuf);
 
     if (sys_ret < 0) {
         // If there is an error on the system call, then the return code should
@@ -187,6 +187,11 @@ int main(int argc, char *argv[]) {
     // 'export SERVER_PORT' lines. Make sure you *do not* print anything
     // to *stdout* before calling `rpcServerInit`.
     //DLOG("Initializing server...");
+    int init_ret = rpcServerInit();
+    if (init_ret < 0) {
+        DLOG("Error initializing server... Return");
+        return 1;
+    }
 
     int ret = 0;
     // TODO: If there is an error with `rpcServerInit`, it maybe useful to have
@@ -239,7 +244,7 @@ int main(int argc, char *argv[]) {
         SETUP_SERVER_ARG(3);
 
         // fi
-        arg_types[1] = encode_arg_type(true, true, true, ARG_CHAR, sizeof(struct fuse_file_info));
+        arg_types[1] = encode_arg_type(true, true, true, ARG_CHAR, 1u);
 
         ret = RPC_REG("open", watdfs_open);
 
@@ -251,7 +256,7 @@ int main(int argc, char *argv[]) {
         SETUP_SERVER_ARG(3);
         
         // fi
-        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, sizeof(struct fuse_file_info));
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
 
         ret = RPC_REG("release", watdfs_release);
 
@@ -263,7 +268,7 @@ int main(int argc, char *argv[]) {
 
     if (exec_ret < 0) {
         DLOG("error with rpcExecute...");
-        return -errno;
+        return 1;
     }
 
     // rpcExecute could fail so you may want to have debug-printing here, and

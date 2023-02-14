@@ -1,0 +1,80 @@
+
+rpcServerInit()
+rpcServerInit(), returned=0
+
+rpcRegister(getattr)
+	ArgTypes:[
+		-1610547199 (is_input:1, is_output:0, is_array:1, type:1, array_len:1)
+		1610678273 (is_input:0, is_output:1, is_array:1, type:1, array_len:1)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+rpcRegister(getattr), returned=0
+
+rpcRegister(mknod)
+	ArgTypes:[
+		-1610547199 (is_input:1, is_output:0, is_array:1, type:1, array_len:1)
+		-2147287040 (is_input:1, is_output:0, is_array:0, type:3, array_len:0)
+		-2147221504 (is_input:1, is_output:0, is_array:0, type:4, array_len:0)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+rpcRegister(mknod), returned=0
+
+rpcRegister(open)
+	ArgTypes:[
+		-1610547199 (is_input:1, is_output:0, is_array:1, type:1, array_len:1)
+		-536805375 (is_input:1, is_output:1, is_array:1, type:1, array_len:1)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+rpcRegister(open), returned=0
+
+rpcRegister(release)
+	ArgTypes:[
+		-1610547199 (is_input:1, is_output:0, is_array:1, type:1, array_len:1)
+		-1610547199 (is_input:1, is_output:0, is_array:1, type:1, array_len:1)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+rpcRegister(release), returned=0
+
+rpcExecute()
+	Listening on address:ubuntu2004-002, port:49459
+
+received execute(getattr)
+	ArgTypes:[
+		-1610547188 (is_input:1, is_output:0, is_array:1, type:1, array_len:12)
+		1610678416 (is_input:0, is_output:1, is_array:1, type:1, array_len:144)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+received execute(getattr), returned:0
+
+received execute(mknod)
+	ArgTypes:[
+		-1610547189 (is_input:1, is_output:0, is_array:1, type:1, array_len:11)
+		-2147287040 (is_input:1, is_output:0, is_array:0, type:3, array_len:0)
+		-2147221504 (is_input:1, is_output:0, is_array:0, type:4, array_len:0)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+received execute(mknod), returned:0
+
+received execute(getattr)
+	ArgTypes:[
+		-1610547188 (is_input:1, is_output:0, is_array:1, type:1, array_len:12)
+		1610678416 (is_input:0, is_output:1, is_array:1, type:1, array_len:144)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+received execute(getattr), returned:0
+
+received execute(open)
+	ArgTypes:[
+		-1610547189 (is_input:1, is_output:0, is_array:1, type:1, array_len:11)
+		-536805336 (is_input:1, is_output:1, is_array:1, type:1, array_len:40)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+received execute(open), returned:0
+
+received execute(release)
+	ArgTypes:[
+		-1610547189 (is_input:1, is_output:0, is_array:1, type:1, array_len:11)
+		-1610547160 (is_input:1, is_output:0, is_array:1, type:1, array_len:40)
+		1073938432 (is_input:0, is_output:1, is_array:0, type:3, array_len:0)
+	]
+received execute(release), returned:0
