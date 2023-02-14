@@ -259,6 +259,12 @@ int main(int argc, char *argv[]) {
     }
 
     // TODO: Hand over control to the RPC library by calling `rpcExecute`.
+    int exec_ret = rpcExecute();
+
+    if (exec_ret < 0) {
+        DLOG("error with rpcExecute...");
+        return -errno;
+    }
 
     // rpcExecute could fail so you may want to have debug-printing here, and
     // then you should return.
