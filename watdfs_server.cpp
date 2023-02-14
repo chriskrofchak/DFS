@@ -86,6 +86,24 @@ int watdfs_getattr(int *argTypes, void **args) {
     return 0;
 }
 
+int watdfs_mknod(int *argTypes, void **args) {
+    (void)argTypes;
+    (void)args;
+    return -ENOSYS;
+}
+
+int watdfs_open(int *argTypes, void **args) {
+    (void)argTypes;
+    (void)args;
+    return -ENOSYS;
+}
+
+int watdfs_release(int *argTypes, void **args) {
+    (void)argTypes;
+    (void)args;
+    return -ENOSYS;
+}
+
 // The main function of the server.
 int main(int argc, char *argv[]) {
     // argv[1] should contain the directory where you should store data on the

@@ -9,6 +9,35 @@ INIT_LOG
 
 #include "rpc.h"
 
+
+/////////////////////////
+// BOILER PLATE
+// makes arg_types, 
+// makes args
+// makes retcode
+// sets [0] to path
+// and [ARG_COUNT - 1] to retcode
+// and null terminates arg_types
+////////////////////////
+#define MAKE_ARGS(__ARG_COUNT, __PATH)              \
+    void **args = new void*[__ARG_COUNT];           \
+    int arg_types[__ARG_COUNT+1];                   \
+    arg_types[0] = encode_arg_path(__PATH);         \
+    args[0] = (void *)__PATH;                       \
+    int retcode = 0;                                \
+    arg_types[__ARG_COUNT-1] = encode_retcode();    \
+    args[__ARG_COUNT-1] = (void*)&retcode;          \
+    arg_types[__ARG_COUNT] = 0
+
+#define VOIDIFY(element) (void *)element
+
+#define RPCIFY(fn_string) rpcCall((char *)fn_string, arg_types, args)
+
+#define FREE_ARGS() delete []args
+
+
+
+
 // SETUP AND TEARDOWN
 void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
                       time_t cache_interval, int *ret_code) {
@@ -50,6 +79,23 @@ void watdfs_cli_destroy(void *userdata) {
     // TODO: clean up your userdata state.
     // TODO: tear down the RPC library by calling `rpcClientDestroy`.
     int rpc_destroy_ret = rpcClientDestroy();
+    (void)rpc_destroy_ret; // TODO... what to do with rpc_destroy_ret
+}
+
+int encode_arg_path(const char* path) {
+    (1u << ARG_INPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) | (uint)strlen(path);
+}
+
+int encode_retcode() {
+    return (1u << ARG_OUTPUT) | (ARG_INT << 16u);
+}
+
+int encode_arg_type(bool is_input, bool is_output, bool is_array, int type, int arr_size) {
+    return ((uint)is_input << ARG_INPUT)   | 
+           ((uint)is_output << ARG_OUTPUT) |
+           ((uint)is_array << ARG_ARRAY)   |
+           (uint)(type << 16u)             | 
+           (uint)arr_size;
 }
 
 // GET FILE ATTRIBUTES
@@ -138,7 +184,32 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
 // CREATE, OPEN AND CLOSE
 int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     // Called to create a file.
-    return -ENOSYS;
+
+    // boilerplate
+    MAKE_ARGS(4, path);
+
+    // mode
+    arg_types[1] = encode_arg_type(true, false, false, ARG_INT, 0);
+    args[1] = VOIDIFY(&mode);
+
+    // dev
+    arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
+    args[2] = VOIDIFY(&dev);
+
+    // make rpc call
+    int rpc_ret = RPCIFY("mknod");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+    } else {
+        // fine!
+        fxn_ret = rpc_ret;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
 int watdfs_cli_open(void *userdata, const char *path,
                     struct fuse_file_info *fi) {
