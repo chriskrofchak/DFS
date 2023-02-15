@@ -112,6 +112,7 @@ int watdfs_mknod(int *argTypes, void **args) {
 
     // args[3] is retcode
     int *ret = (int *)args[3];
+    *ret = 0;
 
     // actual syscall
     int sys_ret = mknod(full_path, *mode, *dev);
@@ -159,7 +160,7 @@ int watdfs_release(int *argTypes, void **args) {
     // actual syscall
     int sys_ret = close(fi->fh);
 
-    // UPDATE_RET;
+    UPDATE_RET;
 
     EPILOGUE(ret, "watdfs_release");
     return 0;
@@ -178,6 +179,7 @@ int watdfs_read(int *argTypes, void **args) {
     struct fuse_file_info *fi = (struct fuse_file_info *)args[4];
     // args[5]
     int *ret = (int *)args[5];
+    *ret = 0;
 
     DLOG("in watdfs_read: size is %d and offset is %d\n", *sz, *offset);
     int sys_ret = pread(fi->fh, buf, *sz, *offset);
@@ -209,6 +211,7 @@ int watdfs_write(int *argTypes, void **args) {
     struct fuse_file_info *fi = (struct fuse_file_info *)args[4];
     // args[5]
     int *ret = (int *)args[5];
+    *ret = 0;
 
     int sys_ret = pwrite(fi->fh, buf, *sz, *offset);
     DLOG("in watdfs_write: sys_ret is %d and errno is %d\n", sys_ret, errno);
@@ -232,6 +235,7 @@ int watdfs_truncate(int *argTypes, void **args) {
     // const char *path = (const char *)args[0];
     off_t *newsize = (off_t *)args[1];
     int *ret = (int *)args[2];
+    *ret = 0;
 
     int sys_ret = truncate(full_path, *newsize);
 
@@ -247,6 +251,7 @@ int watdfs_fsync(int *argTypes, void **args) {
 
     struct fuse_file_info *fi = (struct fuse_file_info *)args[1];
     int *ret = (int *)args[2];
+    *ret = 0;
 
     int sys_ret = fsync(fi->fh);
 
@@ -263,6 +268,7 @@ int watdfs_utimensat(int *argTypes, void **args) {
     // const char *path = (const char *)args[0];
     const struct timespec *ts = (const struct timespec *)args[1];
     int *ret = (int *)args[2];
+    *ret = 0;
 
     int sys_ret = utimensat(0, full_path, ts, 0);
 

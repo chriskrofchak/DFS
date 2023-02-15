@@ -3,33 +3,53 @@ watdfs_init()
 	path_to_cache:/tmp/cikrofch/cache
 	cache_interval:0 s
 fuse_context:
-	fuse = 3c080480
+	fuse = db235480
 	uid =  0
 	gid =  0
 	pid =  0
-	private_data = 3c07eeb0
-	logfile = 3c07fef0
+	private_data = db233eb0
+	logfile = db234ef0
 	path_to_cache = /tmp/cikrofch/cache
 	umask = 00000
 
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
+watdfs_getattr(path="/long_read.txt", statbuf=0x7de3ad30)
+watdfs_getattr(path="/long_read.txt", statbuf=0x7de3ad30) returned=-2
+    si:
+	st_dev =  0
+	st_ino =  0
+	st_mode = 0 0
+	st_nlink =  0
+	st_uid =  0
+	st_gid =  0
+	st_rdev =  0
+	st_size =  0
+	st_blksize =  0
+	st_blocks =  0
+	st_atime = 0x 00000000
+	st_mtime = 0x 00000000
+	st_ctime = 0x 00000000
+
+watdfs_mknod(path="/long_read.txt", mode=0100751, dev=0)
+watdfs_mknod(path="/long_read.txt", mode=0100751, dev=0) returned=0
+
+watdfs_getattr(path="/long_read.txt", statbuf=0x7de3ad30)
+watdfs_getattr(path="/long_read.txt", statbuf=0x7de3ad30) returned=0
     si:
 	st_dev =  2053
-	st_ino =  43950882
+	st_ino =  22712187
 	st_mode = 0 100751
 	st_nlink =  1
 	st_uid =  11958
 	st_gid =  12447
 	st_rdev =  0
-	st_size =  65585
+	st_size =  0
 	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed12d1
-	st_mtime = 0x 63ed12d1
-	st_ctime = 0x 63ed12d1
+	st_blocks =  0
+	st_atime = 0x 63ed3694
+	st_mtime = 0x 63ed3694
+	st_ctime = 0x 63ed3694
 
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
+watdfs_open(path"/long_read.txt", fi=0x7de3ade0)
     fi:
 	flags = 0x 00008002
 	fh_old = 0x 00000000
@@ -46,9 +66,9 @@ watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
 	keep_cache =  0
 	fh = 0x 0000000000000006
 	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
+watdfs_open(path"/long_read.txt", fi=0x7de3ade0) returned=0
 
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0)
+watdfs_write(path="/long_read.txt", buf=0x156ee060, size=50, offset=0, fi=0x7de3ae40)
     fi:
 	flags = 0x 00008002
 	fh_old = 0x 00000006
@@ -56,10 +76,10 @@ watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0x
 	direct_io =  0
 	keep_cache =  0
 	fh = 0x 0000000000000006
-	lock_owner = 0x ceb31642d72952af
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0) returned=65485
+	lock_owner = 0x 809ff20b4acfe934
+watdfs_write(path="/long_read.txt", buf=0x156ee060, size=50, offset=0, fi=0x7de3ae40) returned=50
 
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50)
+watdfs_read(path="/long_read.txt", buf=0xdb25a7e0, size=150, offset=0, fi=0x7de3ade0)
     fi:
 	flags = 0x 00008002
 	fh_old = 0x 00000006
@@ -67,83 +87,12 @@ watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xc
 	direct_io =  0
 	keep_cache =  0
 	fh = 0x 0000000000000006
-	lock_owner = 0x ceb31642d72952af
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50) returned=65485
+	lock_owner = 0x 809ff20b4acfe934
+watdfs_read(path="/long_read.txt", buf=0xdb25a7e0, size=150, offset=0, fi=0x7de3ade0) returned=50
 
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
+always_flush(path="/long_read.txt", fi=0x7de3ade0), returned:0
 
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed14f4
-	st_mtime = 0x 63ed14f4
-	st_ctime = 0x 63ed14f4
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 8c5ffe2b795b294a
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0) returned=65485
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 8c5ffe2b795b294a
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50) returned=65485
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
+watdfs_release(path="/long_read.txt", fi=0x7de3ade0)
     fi:
 	flags = 0x 00008002
 	fh_old = 0x 00000006
@@ -152,645 +101,4 @@ watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
 	keep_cache =  0
 	fh = 0x 0000000000000006
 	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed1509
-	st_mtime = 0x 63ed1509
-	st_ctime = 0x 63ed1509
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x e8ad5a7c5ed3abd3
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0) returned=65485
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x e8ad5a7c5ed3abd3
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50) returned=65485
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed1519
-	st_mtime = 0x 63ed1519
-	st_ctime = 0x 63ed1519
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 3acf30e9ce8aea25
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0) returned=140
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 3acf30e9ce8aea25
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50) returned=140
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed1534
-	st_mtime = 0x 63ed1534
-	st_ctime = 0x 63ed1534
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0c55a49df06115e8
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0) returned=140
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0c55a49df06115e8
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50) returned=140
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed1545
-	st_mtime = 0x 63ed1545
-	st_ctime = 0x 63ed1545
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 3acf30e9ce8aea25
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0) returned=140
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 3acf30e9ce8aea25
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50) returned=140
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed156b
-	st_mtime = 0x 63ed156b
-	st_ctime = 0x 63ed156b
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x c60b388c67cf1069
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0) returned=140
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x c60b388c67cf1069
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50) returned=140
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed1579
-	st_mtime = 0x 63ed1579
-	st_ctime = 0x 63ed1579
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 87e72b372ea0dad4
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=140, offset=0, fi=0xcfeacbb0) returned=140
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 87e72b372ea0dad4
-watdfs_read(path="/long_write.txt", buf=0x3c0a57e0, size=140, offset=0, fi=0xcfeacb50) returned=140
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed15a7
-	st_mtime = 0x 63ed15a7
-	st_ctime = 0x 63ed15a7
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 857ad124ab2e1b85
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65485, offset=0, fi=0xcfeacbb0) returned=65485
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 857ad124ab2e1b85
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65485, offset=0, fi=0xcfeacb50) returned=65485
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed15b7
-	st_mtime = 0x 63ed15b7
-	st_ctime = 0x 63ed15b7
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65535, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 5225b70da40717cc
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65535, offset=0, fi=0xcfeacbb0) returned=65535
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65535, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 5225b70da40717cc
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65535, offset=0, fi=0xcfeacb50) returned=65535
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0)
-watdfs_getattr(path="/long_write.txt", statbuf=0xcfeacaa0) returned=0
-    si:
-	st_dev =  2053
-	st_ino =  43950882
-	st_mode = 0 100751
-	st_nlink =  1
-	st_uid =  11958
-	st_gid =  12447
-	st_rdev =  0
-	st_size =  65585
-	st_blksize =  4096
-	st_blocks =  136
-	st_atime = 0x 63ed15bf
-	st_mtime = 0x 63ed15bf
-	st_ctime = 0x 63ed15bf
-
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000000
-	lock_owner = 0x 0000000000000000
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000000
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_open(path"/long_write.txt", fi=0xcfeacb50) returned=0
-
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65545, offset=0, fi=0xcfeacbb0)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 7bff3ee1d676a060
-watdfs_write(path="/long_write.txt", buf=0x840ad060, size=65545, offset=0, fi=0xcfeacbb0) returned=65545
-
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65545, offset=0, fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 7bff3ee1d676a060
-watdfs_read(path="/long_write.txt", buf=0x3c0a6130, size=65545, offset=0, fi=0xcfeacb50) returned=-22
-
-always_flush(path="/long_write.txt", fi=0xcfeacb50), returned:0
-
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50)
-    fi:
-	flags = 0x 00008002
-	fh_old = 0x 00000006
-	writepage =  0
-	direct_io =  0
-	keep_cache =  0
-	fh = 0x 0000000000000006
-	lock_owner = 0x 0000000000000000
-watdfs_release(path="/long_write.txt", fi=0xcfeacb50) returned=-22
-
-watdfs_destroy(userdata=0x3c07eeb0)
+watdfs_release(path="/long_read.txt", fi=0x7de3ade0) returned=0
