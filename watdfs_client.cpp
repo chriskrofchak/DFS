@@ -322,6 +322,43 @@ int watdfs_read_write_single(
     return fxn_ret;
 }
 
+// uses "read" but is really either read or write
+int watds_read_write_full(
+    void *userdata,
+    const char *path,
+    char *buf, 
+    size_t size,
+    off_t offset,
+    struct fuse_file_info *fi,
+    bool is_read
+)
+{
+    size_t temp_left_to_read = size;
+    off_t temp_offset = offset;
+    char * temp_buf = buf;
+    int rpc_ret, fxn_ret;
+    fxn_ret = 0
+    while (temp_left_to_read > 0) {
+        size_t to_read = std::min(MAX_ARRAY_LEN, temp_left_to_read);
+        rpc_ret = watdfs_read_write_single(userdata, path, temp_buf, to_read, temp_offset, fi, is_read);
+        
+        // error handling
+        if (rpc_ret < 0) {
+            DLOG("one of reads or writes went wrong, carrying up the error...");
+            return -EINVAL;
+        } else {
+            // good! add this to fxn_ret
+            fxn_ret += rpc_ret;
+        }
+
+        // increment as we loop
+        temp_left_to_read -= to_read;
+        temp_buf += to_read;
+        temp_offset += (off_t)to_read;
+    }
+    return fxn_ret;
+}
+
 // READ AND WRITE DATA
 int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
                     off_t offset, struct fuse_file_info *fi) {
