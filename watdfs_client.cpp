@@ -408,7 +408,7 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
 
     // newsize
     arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)2*sizeof(struct timespec));
-    args[1] = VOIDIFY(ts);
+    args[1] = VOIDIFY(&ts);
 
     // call rpc 
     int rpc_ret = RPCIFY("utimensat");

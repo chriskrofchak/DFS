@@ -226,10 +226,31 @@ int watdfs_truncate(int *argTypes, void **args) {
 }
 
 int watdfs_fsync(int *argTypes, void **args) {
+    PROLOGUE;
+
+    struct fuse_file_info *fi = (struct fuse_file_info *)args[1];
+    int *ret = (int *)args[2];
+
+    int sys_ret = fsync(fi->fh);
+
+    // HANDLE ERRORS
+    UPDATE_RET;
+
+    EPILOGUE(ret);
     return 0;
 }
 
 int watdfs_utimensat(int *argTypes, void **args) {
+    PROLOGUE;
+
+    const char *path = (const char *)args[0];
+    const struct timespec ts[2] = (const struct timespec *)args[1];
+
+    int sys_ret = utimensat(0, path, ts, 0);
+
+    UPDATE_RET;
+
+    EPILOGUE(ret); 
     return 0;
 }
 
