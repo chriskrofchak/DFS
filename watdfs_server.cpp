@@ -177,7 +177,7 @@ int watdfs_read(int *argTypes, void **args) {
     // args[5]
     int *ret = (int *)args[5];
 
-    int sys_ret = pread(fi->fh, buf, sz, offset);
+    int sys_ret = pread(fi->fh, buf, *sz, *offset);
 
     // HANDLE ERRORS
     UPDATE_RET;
@@ -200,7 +200,7 @@ int watdfs_write(int *argTypes, void **args) {
     // args[5]
     int *ret = (int *)args[5];
 
-    int sys_ret = pwrite(fi->fh, buf, sz, offset);
+    int sys_ret = pwrite(fi->fh, buf, *sz, *offset);
 
     // HANDLE ERRORS
     UPDATE_RET;
