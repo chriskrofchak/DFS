@@ -216,7 +216,7 @@ int watdfs_truncate(int *argTypes, void **args) {
     off_t *newsize = (off_t *)args[1];
     int *ret = (int *)args[2];
 
-    int sys_ret = truncate(path, newsize);
+    int sys_ret = truncate(path, *newsize);
 
     // HANDLE ERRORS
     UPDATE_RET;
