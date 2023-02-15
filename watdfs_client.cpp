@@ -323,7 +323,7 @@ int watdfs_read_write_single(
 }
 
 // uses "read" but is really either read or write
-int watds_read_write_full(
+int watdfs_read_write_full(
     void *userdata,
     const char *path,
     char *buf, 
