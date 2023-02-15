@@ -1,8 +1,8 @@
 import os
 
 user_ = os.environ.get("USER")
-stats = os.stat("/tmp/" + user_ + "/mount/open_write.txt")
+filename = "/tmp/" + user_ + "/mount/myfile3.txt"
+stats = os.stat(filename)
+
 print(stats)
-
-
 

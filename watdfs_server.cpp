@@ -116,6 +116,8 @@ int watdfs_mknod(int *argTypes, void **args) {
     // actual syscall
     int sys_ret = mknod(full_path, *mode, *dev);
 
+    DLOG("Return val is %d, errno is %d", sys_ret, errno);
+
     UPDATE_RET;
 
     EPILOGUE(ret, "watdfs_mknod");
@@ -157,14 +159,14 @@ int watdfs_release(int *argTypes, void **args) {
     // actual syscall
     int sys_ret = close(fi->fh);
 
-    UPDATE_RET;
+    // UPDATE_RET;
 
     EPILOGUE(ret, "watdfs_release");
     return 0;
 }
 
 int watdfs_read(int *argTypes, void **args) {
-    PROLOGUE;
+    // PROLOGUE;
 
     // args[1]
     char *buf = (char *)args[1];
@@ -189,12 +191,13 @@ int watdfs_read(int *argTypes, void **args) {
         *ret = -errno;
     }
 
-    EPILOGUE(ret, "watdfs_read");
+    DLOG("Returning from watdfs_read with code: %d", *ret);
+    // EPILOGUE(ret, "watdfs_read");
     return 0;
 }
 
 int watdfs_write(int *argTypes, void **args) {
-    PROLOGUE;
+    // PROLOGUE;
 
     // args[1]
     const char *buf = (const char *)args[1];
@@ -218,7 +221,8 @@ int watdfs_write(int *argTypes, void **args) {
         *ret = -errno;
     }
 
-    EPILOGUE(ret, "watdfs_write");
+    DLOG("Returning from watdfs_write with code: %d", *ret);
+    // EPILOGUE(ret, "watdfs_write");
     return 0;
 }
 
