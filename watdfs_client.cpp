@@ -9,7 +9,7 @@
 INIT_LOG
 
 #include "rpc.h"
-
+#include <algorithm>
 
 
 /////////////////////////
