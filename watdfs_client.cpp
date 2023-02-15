@@ -343,18 +343,90 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
 
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
-    return -ENOSYS;
+    MAKE_CLIENT_ARGS(3, path);
+
+    // newsize
+    arg_types[1] = encode_arg_type(true, false, false, ARG_LONG, 0);
+    args[1] = VOIDIFY(&newsize);
+
+    // call rpc 
+    int rpc_ret = RPCIFY("truncate");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        DLOG("truncate rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        // fine!
+        DLOG("truncate call itself failed with error '%d'", retcode);
+        fxn_ret = retcode;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
 
 int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
     // Force a flush of file data.
-    return -ENOSYS;
+    MAKE_CLIENT_ARGS(3, path);
+
+    // newsize
+    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
+    args[1] = VOIDIFY(fi);
+
+    // call rpc 
+    int rpc_ret = RPCIFY("fsync");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        DLOG("fsync rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        // fine!
+        DLOG("fsync call itself failed with error '%d'", retcode);
+        fxn_ret = retcode;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
 
 // CHANGE METADATA
 int watdfs_cli_utimensat(void *userdata, const char *path,
                        const struct timespec ts[2]) {
     // Change file access and modification times.
-    return -ENOSYS;
+    MAKE_CLIENT_ARGS(3, path);
+
+    // newsize
+    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)2*sizeof(struct timespec));
+    args[1] = VOIDIFY(ts);
+
+    // call rpc 
+    int rpc_ret = RPCIFY("utimensat");
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        DLOG("utimensat rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        // fine!
+        DLOG("utimensat call itself failed with error '%d'", retcode);
+        fxn_ret = retcode;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
 }
