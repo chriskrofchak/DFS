@@ -311,7 +311,7 @@ int watdfs_read_write_single(
         if (is_read)
             DLOG("read operation itself failed with err code %d", retcode);
         else
-            DLOG("read operation itself failed with err code %d", retcode);
+            DLOG("write operation itself failed with err code %d", retcode);
         
         // fine!
         fxn_ret = retcode;

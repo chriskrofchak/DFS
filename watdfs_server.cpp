@@ -28,7 +28,7 @@ std::mutex persist_mut{};
 #define SETUP_SERVER_ARG(__ARG_COUNT) \
     MAKE_ARG_TYPES(__ARG_COUNT); SETUP_ARG_TYPES(__ARG_COUNT, "1") 
 
-#define EPILOGUE(ret) free(full_path); DLOG("Returning code: %d", *ret)
+#define EPILOGUE(ret, fn) free(full_path); DLOG("Returning from %s with code: %d", fn, *ret)
 
 #define RPC_REG(fn_string, fn_name) rpcRegister((char *)fn_string, arg_types, fn_name)
 
@@ -118,7 +118,7 @@ int watdfs_mknod(int *argTypes, void **args) {
 
     UPDATE_RET;
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_mknod");
     return 0;
 }
 
@@ -140,7 +140,7 @@ int watdfs_open(int *argTypes, void **args) {
     // else, fill in file descriptor to fi
     fi->fh = fd;
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_open");
     return 0;
 }
 
@@ -159,7 +159,7 @@ int watdfs_release(int *argTypes, void **args) {
 
     UPDATE_RET;
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_release");
     return 0;
 }
 
@@ -177,12 +177,19 @@ int watdfs_read(int *argTypes, void **args) {
     // args[5]
     int *ret = (int *)args[5];
 
+    DLOG("in watdfs_read: size is %d and offset is %d\n", *sz, *offset);
     int sys_ret = pread(fi->fh, buf, *sz, *offset);
+    DLOG("in watdfs_read: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
-    UPDATE_RET;
+    // UPDATE_RET;
+    if (sys_ret >= 0) {
+        *ret = sys_ret;
+    } else {
+        *ret = -errno;
+    }
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_read");
     return 0;
 }
 
@@ -201,27 +208,33 @@ int watdfs_write(int *argTypes, void **args) {
     int *ret = (int *)args[5];
 
     int sys_ret = pwrite(fi->fh, buf, *sz, *offset);
+    DLOG("in watdfs_write: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
-    UPDATE_RET;
+    // UPDATE_RET;
+    if (sys_ret >= 0) {
+        *ret = sys_ret;
+    } else {
+        *ret = -errno;
+    }
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_write");
     return 0;
 }
 
 int watdfs_truncate(int *argTypes, void **args) {
     PROLOGUE;
 
-    const char *path = (const char *)args[0];
+    // const char *path = (const char *)args[0];
     off_t *newsize = (off_t *)args[1];
     int *ret = (int *)args[2];
 
-    int sys_ret = truncate(path, *newsize);
+    int sys_ret = truncate(full_path, *newsize);
 
     // HANDLE ERRORS
     UPDATE_RET;
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_truncate");
     return 0;
 }
 
@@ -236,22 +249,22 @@ int watdfs_fsync(int *argTypes, void **args) {
     // HANDLE ERRORS
     UPDATE_RET;
 
-    EPILOGUE(ret);
+    EPILOGUE(ret, "watdfs_fsync");
     return 0;
 }
 
 int watdfs_utimensat(int *argTypes, void **args) {
     PROLOGUE;
 
-    const char *path = (const char *)args[0];
+    // const char *path = (const char *)args[0];
     const struct timespec *ts = (const struct timespec *)args[1];
     int *ret = (int *)args[2];
 
-    int sys_ret = utimensat(0, path, ts, 0);
+    int sys_ret = utimensat(0, full_path, ts, 0);
 
     UPDATE_RET;
 
-    EPILOGUE(ret); 
+    EPILOGUE(ret, "watdfs_utimensat"); 
     return 0;
 }
 
