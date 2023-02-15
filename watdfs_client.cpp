@@ -11,6 +11,7 @@ INIT_LOG
 #include "rpc.h"
 
 
+
 /////////////////////////
 // BOILER PLATE
 // makes arg_types, 
@@ -189,7 +190,7 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
         fxn_ret = -EINVAL;
     } else {
         // fine!
-        fxn_ret = rpc_ret;
+        fxn_ret = retcode;
     }
 
     // FREE boilerplate at end
@@ -217,7 +218,7 @@ int watdfs_cli_open(void *userdata, const char *path,
         fxn_ret = -EINVAL;
     } else {
         // fine!
-        fxn_ret = rpc_ret;
+        fxn_ret = retcode;
     }
 
     // FREE boilerplate at end
@@ -247,7 +248,73 @@ int watdfs_cli_release(void *userdata, const char *path,
         fxn_ret = -EINVAL;
     } else {
         // fine!
-        fxn_ret = rpc_ret;
+        fxn_ret = retcode;
+    }
+
+    // FREE boilerplate at end
+    FREE_ARGS();
+    return fxn_ret;
+}
+
+int watdfs_read_write_single(
+    void *userdata, 
+    const char *path, 
+    char *buf, 
+    size_t size,
+    off_t offset, 
+    struct fuse_file_info *fi,
+    bool is_read)
+{
+    // put it here
+    // size < MAX_ARRAY_LEN
+    MAKE_CLIENT_ARGS(6, path);
+
+    // buf
+    if (is_read) {
+        arg_types[1] = encode_arg_type(false, true, true, ARG_CHAR, size);
+    } else {
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, size);
+    }
+    args[1] = VOIDIFY(buf);
+
+    // size
+    arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
+    args[2] = VOIDIFY(&size);
+
+    // offset
+    arg_types[3] = encode_arg_type(true, false, false, ARG_LONG, 0);
+    args[3] = VOIDIFY(&offset);
+
+    // fi
+    arg_types[4] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
+    args[4] = VOIDIFY(fi);
+
+    int rpc_ret = 0;
+    if (is_read) {
+        rpc_ret = RPCIFY("read");
+    } else {
+        rpc_ret = RPCIFY("write");
+    } 
+
+    int fxn_ret = 0;
+
+    if (rpc_ret < 0) {
+        // handle errors
+        if (is_read)
+            DLOG("read rpc failed with error '%d'", rpc_ret);
+        else
+            DLOG("write rpc failed with error '%d'", rpc_ret);
+        // Something went wrong with the rpcCall, return a sensible return
+        // value. In this case lets return, -EINVAL
+        fxn_ret = -EINVAL;
+    } else {
+        if (is_read)
+            DLOG("read operation itself failed with err code %d", retcode);
+        else
+            DLOG("read operation itself failed with err code %d", retcode);
+        
+        // fine!
+        fxn_ret = retcode;
     }
 
     // FREE boilerplate at end
@@ -259,19 +326,21 @@ int watdfs_cli_release(void *userdata, const char *path,
 int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
                     off_t offset, struct fuse_file_info *fi) {
     // Read size amount of data at offset of file into buf.
-
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
-    return -ENOSYS;
+
+    return watdfs_read_write_single(userdata, path, buf, size, offset, fi, true);
 }
+
 int watdfs_cli_write(void *userdata, const char *path, const char *buf,
                      size_t size, off_t offset, struct fuse_file_info *fi) {
     // Write size amount of data at offset of file from buf.
 
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
-    return -ENOSYS;
+    return watdfs_read_write_single(userdata, path, buf, size, offset, fi, false);
 }
+
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
     return -ENOSYS;
