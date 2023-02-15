@@ -20,7 +20,8 @@ res = os.pread(fd, SIZE, 0)
 if (res == test_string):
     print("Successfully read test_string")
 else:
-    print(res)
+    print("Couldnt read all bytes correctly. Read", len(res), "bytes.")
+    # print(res)
 
 os.close(fd)
 print("Successfully closed file")
