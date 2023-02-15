@@ -337,7 +337,7 @@ int watds_read_write_full(
     off_t temp_offset = offset;
     char * temp_buf = buf;
     int rpc_ret, fxn_ret;
-    fxn_ret = 0
+    fxn_ret = 0;
     while (temp_left_to_read > 0) {
         size_t to_read = std::min(MAX_ARRAY_LEN, temp_left_to_read);
         rpc_ret = watdfs_read_write_single(userdata, path, temp_buf, to_read, temp_offset, fi, is_read);
