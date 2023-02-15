@@ -244,7 +244,8 @@ int watdfs_utimensat(int *argTypes, void **args) {
     PROLOGUE;
 
     const char *path = (const char *)args[0];
-    const struct timespec ts[2] = (const struct timespec *)args[1];
+    const struct timespec *ts = (const struct timespec *)args[1];
+    int *ret = (int *)args[2];
 
     int sys_ret = utimensat(0, path, ts, 0);
 
