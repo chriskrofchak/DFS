@@ -338,7 +338,7 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
 
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
-    return watdfs_read_write_single(userdata, path, buf, size, offset, fi, false);
+    return watdfs_read_write_single(userdata, path, (char *)buf, size, offset, fi, false);
 }
 
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
