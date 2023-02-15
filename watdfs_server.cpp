@@ -163,6 +163,76 @@ int watdfs_release(int *argTypes, void **args) {
     return 0;
 }
 
+int watdfs_read(int *argTypes, void **args) {
+    PROLOGUE;
+
+    // args[1]
+    char *buf = (char *)args[1];
+    // args[2]
+    size_t *sz = (size_t *)args[2];
+    // args[3]
+    off_t *offset = (off_t *)args[3];
+    // args[4]
+    struct fuse_file_info *fi = (struct fuse_file_info *)args[4];
+    // args[5]
+    int *ret = (int *)args[5];
+
+    int sys_ret = pread(fi->fh, buf, sz, offset);
+
+    // HANDLE ERRORS
+    UPDATE_RET;
+
+    EPILOGUE(ret);
+    return 0;
+}
+
+int watdfs_write(int *argTypes, void **args) {
+    PROLOGUE;
+
+    // args[1]
+    const char *buf = (const char *)args[1];
+    // args[2]
+    size_t *sz = (size_t *)args[2];
+    // args[3]
+    off_t *offset = (off_t *)args[3];
+    // args[4]
+    struct fuse_file_info *fi = (struct fuse_file_info *)args[4];
+    // args[5]
+    int *ret = (int *)args[5];
+
+    int sys_ret = pwrite(fi->fh, buf, sz, offset);
+
+    // HANDLE ERRORS
+    UPDATE_RET;
+
+    EPILOGUE(ret);
+    return 0;
+}
+
+int watdfs_truncate(int *argTypes, void **args) {
+    PROLOGUE;
+
+    const char *path = (const char *)args[0];
+    off_t *newsize = (off_t *)args[1];
+    int *ret = (int *)args[2];
+
+    int sys_ret = truncate(path, newsize);
+
+    // HANDLE ERRORS
+    UPDATE_RET;
+
+    EPILOGUE(ret);
+    return 0;
+}
+
+int watdfs_fsync(int *argTypes, void **args) {
+    return 0;
+}
+
+int watdfs_utimensat(int *argTypes, void **args) {
+    return 0;
+}
+
 // The main function of the server.
 int main(int argc, char *argv[]) {
     // argv[1] should contain the directory where you should store data on the
@@ -259,6 +329,62 @@ int main(int argc, char *argv[]) {
         arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
 
         ret = RPC_REG("release", watdfs_release);
+
+        if (ret < 0) return ret;
+    }
+
+    // read 
+    {
+        SETUP_SERVER_ARG(6);
+        arg_types[1] = encode_arg_type(false, true, true, ARG_CHAR, 1u);
+        arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
+        arg_types[3] = encode_arg_type(true, false, false, ARG_LONG, 0);
+        arg_types[4] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
+
+        ret = RPC_REG("read", watdfs_read);
+
+        if (ret < 0) return ret;
+    }
+
+    // write 
+    {
+        SETUP_SERVER_ARG(6);
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
+        arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
+        arg_types[3] = encode_arg_type(true, false, false, ARG_LONG, 0);
+        arg_types[4] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
+
+        ret = RPC_REG("write", watdfs_write);
+
+        if (ret < 0) return ret;
+    }
+
+    // truncate
+    {
+        SETUP_SERVER_ARG(3);
+        arg_types[1] = encode_arg_type(true, false, false, ARG_LONG, 0);
+
+        ret = RPC_REG("truncate", watdfs_truncate);
+
+        if (ret < 0) return ret;
+    }
+
+    // fsync
+    {
+        SETUP_SERVER_ARG(3);
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
+
+        ret = RPC_REG("fsync", watdfs_fsync);
+
+        if (ret < 0) return ret;
+    }
+
+    // utimensat
+    {
+        SETUP_SERVER_ARG(3);
+        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, 1u);
+
+        ret = RPC_REG("utimensat", watdfs_utimensat);
 
         if (ret < 0) return ret;
     }
