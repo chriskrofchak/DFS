@@ -24,7 +24,7 @@ typedef struct rw_lock {
 
     // The number of active readers.
     int num_readers_;
-    // The number of active readers (should only ever be 0 or 1).
+    // The number of active writers (should only ever be 0 or 1).
     int num_writers_;
     // The number of waiting writers, needed to prevent writer starvation.
     int num_waiting_writers_;

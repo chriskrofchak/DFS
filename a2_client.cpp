@@ -1,115 +1,8 @@
-//
-// Starter code for CS 454/654
-// You SHOULD change this file
-//
-
-#include "watdfs_client.h"
-#include "watdfs_make_args.h"
-#include "debug.h"
-INIT_LOG
-#include "rpc.h"
-#include <algorithm>
 #include "a2_client.h"
-#include <mutex>
-#include <string>
 
-std::string path_to_cache{};
-std::mutex path_cache_mut{};
-
-std::string full_cache_path(const char* path) {
-    return path_to_cache + std::string(path);
-} 
-
-#define HANDLE_RET(ret)                     \
-  if (ret < 0) {                            \
-      DLOG("failed with retcode %d", ret);  \
-      return ret;                           \
-  }
-
-// NOW FOR A3.... HAVE THESE CHANGES
-int watdfs_cli_transfer_file(void *userdata, const char *path) {
-    // GET ATTR
-    struct stat statbuf{};
-
-    int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-
-    HANDLE_RET(fn_ret)
-
-    // TRUNCATE FILE TO DESIRED SIZE
-    std::string full_path = full_cache_path(path);
-    fn_ret = truncate(full_path.c_str(), statbuf.st_size);
-
-    HANDLE_RET(fn_ret)
-
-    // READ FILE INTO CACHE 
-    char buf[statbuf.st_size];
-    struct fuse_file_info fi{};
-    fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, &fi);
-    
-    HANDLE_RET(fn_ret)
-
-    // write to client
-    int fd = open(full_path, O_RDWR | O_CREAT);
-    fn_ret = write(fd, buf, statbuf.st_size);
-
-    HANDLE_RET(fn_ret);
-
-    // update file metadata(?) TODO
-
-    return 0;
-}
-
-int watdfs_server_flush_file(void *userdata, const char *path) {
-
-}
-
-
-// SETUP AND TEARDOWN
-void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
-                      time_t cache_interval, int *ret_code) {
-    // TODO: set up the RPC library by calling `rpcClientInit`.
-    int rpc_init_ret = rpcClientInit();
-
-    // TODO: check the return code of the `rpcClientInit` call
-    // `rpcClientInit` may fail, for example, if an incorrect port was exported.
-    if (rpc_init_ret < 0) {
-        // rpcClientInit failed, so set return code to error
-        *ret_code = -EINVAL;
-    }
-
-    // It may be useful to print to stderr or stdout during debugging.
-    // Important: Make sure you turn off logging prior to submission!
-    // One useful technique is to use pre-processor flags like:
-    // # ifdef PRINT_ERR
-    // std::cerr << "Failed to initialize RPC Client" << std::endl;
-    // #endif
-    // Tip: Try using a macro for the above to minimize the debugging code.
-
-    // TODO Initialize any global state that you require for the assignment and return it.
-    // The value that you return here will be passed as userdata in other functions.
-    // In A1, you might not need it, so you can return `nullptr`.
-    void *userdata = nullptr;
-
-    // TODO: save `path_to_cache` and `cache_interval` (for A3).
-
-    // TODO: set `ret_code` to 0 if everything above succeeded else some appropriate
-    // non-zero value.
-    if (rpc_init_ret == 0)
-        *ret_code = 0;
-
-    // Return pointer to global state data.
-    return userdata;
-}
-
-void watdfs_cli_destroy(void *userdata) {
-    // TODO: clean up your userdata state.
-    // TODO: tear down the RPC library by calling `rpcClientDestroy`.
-    int rpc_destroy_ret = rpcClientDestroy();
-    (void)rpc_destroy_ret; // TODO... what to do with rpc_destroy_ret
-}
 
 // GET FILE ATTRIBUTES
-int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
+int a2::watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     // SET UP THE RPC CALL
     DLOG("watdfs_cli_getattr called for '%s'", path);
     
@@ -192,7 +85,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
 }
 
 // CREATE, OPEN AND CLOSE
-int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
+int a2::watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     // Called to create a file.
 
     // boilerplate
@@ -226,7 +119,7 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     return fxn_ret;
 }
 
-int watdfs_cli_open(void *userdata, const char *path,
+int a2::watdfs_cli_open(void *userdata, const char *path,
                     struct fuse_file_info *fi) {
     // Called during open.
     // You should fill in fi->fh.
@@ -255,7 +148,7 @@ int watdfs_cli_open(void *userdata, const char *path,
     return fxn_ret;
 }
 
-int watdfs_cli_release(void *userdata, const char *path,
+int a2::watdfs_cli_release(void *userdata, const char *path,
                        struct fuse_file_info *fi) {
     // Called during close, but possibly asynchronously.
     // Called during open.
@@ -285,7 +178,7 @@ int watdfs_cli_release(void *userdata, const char *path,
     return fxn_ret;
 }
 
-int watdfs_read_write_single(
+int a2::watdfs_read_write_single(
     void *userdata, 
     const char *path, 
     char *buf, 
@@ -352,7 +245,7 @@ int watdfs_read_write_single(
 }
 
 // uses "read" but is really either read or write
-int watdfs_read_write_full(
+int a2::watdfs_read_write_full(
     void *userdata,
     const char *path,
     char *buf, 
@@ -391,25 +284,25 @@ int watdfs_read_write_full(
 }
 
 // READ AND WRITE DATA
-int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
+int a2::watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
                     off_t offset, struct fuse_file_info *fi) {
     // Read size amount of data at offset of file into buf.
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
 
-    return watdfs_read_write_full(userdata, path, buf, size, offset, fi, true);
+    return a2::watdfs_read_write_full(userdata, path, buf, size, offset, fi, true);
 }
 
-int watdfs_cli_write(void *userdata, const char *path, const char *buf,
+int a2::watdfs_cli_write(void *userdata, const char *path, const char *buf,
                      size_t size, off_t offset, struct fuse_file_info *fi) {
     // Write size amount of data at offset of file from buf.
 
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
-    return watdfs_read_write_full(userdata, path, (char *)buf, size, offset, fi, false);
+    return a2::watdfs_read_write_full(userdata, path, (char *)buf, size, offset, fi, false);
 }
 
-int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
+int a2::watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
     MAKE_CLIENT_ARGS(3, path);
 
@@ -438,7 +331,7 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     return fxn_ret;
 }
 
-int watdfs_cli_fsync(void *userdata, const char *path,
+int a2::watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
     // Force a flush of file data.
     MAKE_CLIENT_ARGS(3, path);
@@ -469,7 +362,7 @@ int watdfs_cli_fsync(void *userdata, const char *path,
 }
 
 // CHANGE METADATA
-int watdfs_cli_utimensat(void *userdata, const char *path,
+int a2::watdfs_cli_utimensat(void *userdata, const char *path,
                        const struct timespec ts[2]) {
     // Change file access and modification times.
     MAKE_CLIENT_ARGS(3, path);
