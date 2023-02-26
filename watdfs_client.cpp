@@ -10,18 +10,23 @@
 #include "rpc.h"
 #include "a2_client.h"
 
+// SYSCALLS
+#include <fcntl.h>           /* Definition of AT_* constants */
+#include <sys/stat.h>
+
 // C++ HEADERS
 #include <algorithm>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 INIT_LOG
 
-std::string path_to_cache{};
-std::mutex path_cache_mut{};
+std::string CACHE_PATH{};
+std::mutex CACHE_MUT{};
 
 std::string full_cache_path(const char* path) {
-    return path_to_cache + std::string(path);
+    return CACHE_PATH + std::string(path);
 } 
 
 #define HANDLE_RET(ret)                     \
@@ -29,6 +34,17 @@ std::string full_cache_path(const char* path) {
       DLOG("failed with retcode %d", ret);  \
       return ret;                           \
   }
+
+class OpenBook {
+    // filename, bool open for Write.
+    std::unordered_map<std::string, bool> open_files;
+    OpenBook() : open_files() {}
+    ~OpenBook() {}
+
+    // open and close adds and removes from OpenBook
+    open(std::string filename, bool forWrite);
+    close(std::string filename);
+};
 
 // NOW FOR A3.... HAVE THESE CHANGES
 // ASSUME FILE EXISTS
@@ -49,8 +65,13 @@ int watdfs_cli_transfer_file(void *userdata, const char *path) {
     // READ FILE INTO CACHE 
     char buf[statbuf.st_size];
     struct fuse_file_info fi{};
+
+    fi.flags
+
+    fn_ret = a2::watdfs_cli_open(userdata, path, &fi);
+    HANDLE_RET(fn_ret)
+
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, &fi);
-    
     HANDLE_RET(fn_ret)
 
     // write to client
@@ -60,11 +81,35 @@ int watdfs_cli_transfer_file(void *userdata, const char *path) {
     HANDLE_RET(fn_ret);
 
     // update file metadata(?) TODO
-
+    // update times? 
+    // Idk if this breaks anything... May want to comment for now
+    // chmod(full_path.c_str(), statbuf.st_mode);
+    // chown(full_path.c_str(), statbuf.st_uid, statbuf.st_gid);
     return 0;
 }
 
+// ASSUMES THAT THE FILE IS IN THE CORRECT PATH
 int watdfs_server_flush_file(void *userdata, const char *path) {
+
+    // get file locally
+    std::string full_path = full_cache_path(path);
+
+    // read into buf
+    struct stat statbuf{};
+    int fn_ret = stat(full_path.c_str(), &statbuf);
+    HANDLE_RET(fn_ret)
+    int fd = open(full_path.c_str(), O_RDONLY);
+    int buf[statbuf.st_size];
+    read(fd, (void *)buf, statbuf.st_size);
+
+    // write buf on server
+    // todo fix fuse_file_info
+    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, nullptr);
+    HANDLE_RET(fn_ret)
+
+    // update times on server
+    struct timespec times[2] = { statbuf.st_atimespec, statbuf.st_mtimespec };
+    fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
     return 0;
 }
 
@@ -74,6 +119,8 @@ void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
                       time_t cache_interval, int *ret_code) {
     // TODO: set up the RPC library by calling `rpcClientInit`.
     int rpc_init_ret = rpcClientInit();
+
+    CACHE_PATH = std::string(path_to_cache);
 
     // TODO: check the return code of the `rpcClientInit` call
     // `rpcClientInit` may fail, for example, if an incorrect port was exported.
