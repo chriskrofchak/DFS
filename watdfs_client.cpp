@@ -3,15 +3,19 @@
 // You SHOULD change this file
 //
 
+// C LIKE HEADERS
 #include "watdfs_client.h"
 #include "watdfs_make_args.h"
 #include "debug.h"
-INIT_LOG
 #include "rpc.h"
-#include <algorithm>
 #include "a2_client.h"
+
+// C++ HEADERS
+#include <algorithm>
 #include <mutex>
 #include <string>
+
+INIT_LOG
 
 std::string path_to_cache{};
 std::mutex path_cache_mut{};
@@ -27,6 +31,7 @@ std::string full_cache_path(const char* path) {
   }
 
 // NOW FOR A3.... HAVE THESE CHANGES
+// ASSUME FILE EXISTS
 int watdfs_cli_transfer_file(void *userdata, const char *path) {
     // GET ATTR
     struct stat statbuf{};
@@ -49,7 +54,7 @@ int watdfs_cli_transfer_file(void *userdata, const char *path) {
     HANDLE_RET(fn_ret)
 
     // write to client
-    int fd = open(full_path, O_RDWR | O_CREAT);
+    int fd = open(full_path.c_str(), O_RDWR | O_CREAT);
     fn_ret = write(fd, buf, statbuf.st_size);
 
     HANDLE_RET(fn_ret);
@@ -60,7 +65,7 @@ int watdfs_cli_transfer_file(void *userdata, const char *path) {
 }
 
 int watdfs_server_flush_file(void *userdata, const char *path) {
-
+    return 0;
 }
 
 
