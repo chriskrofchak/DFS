@@ -29,9 +29,9 @@ std::string full_cache_path(const char* path) {
     return CACHE_PATH + std::string(path);
 } 
 
-#define HANDLE_RET(ret)                     \
+#define HANDLE_RET(msg, ret)                     \
   if (ret < 0) {                            \
-      DLOG("failed with retcode %d", ret);  \
+      DLOG("failed with message %s\n and retcode %d", msg, ret);  \
       return ret;                           \
   }
 
@@ -42,74 +42,95 @@ class OpenBook {
     ~OpenBook() {}
 
     // open and close adds and removes from OpenBook
-    open(std::string filename, bool forWrite);
-    close(std::string filename);
+    int OB_open(std::string filename, bool forWrite);
+    int OB_close(std::string filename);
 };
+
+bool watdfs_cli_fresh_file(const char *path) {
+    struct stat statbuf{};
+    int fn_ret = a2::watdfs_cli_getattr(nullptr, path, &statbuf);
+    if (fn_ret < 0) {
+        if (fn_ret == -ENOENT) return 0;
+        // else, it was another error...
+        HANDLE_RET("failed to properly check if file exists on server (cli_file_exists)", fn_ret)
+        return fn_ret;
+    }
+    return 1;
+}
 
 // NOW FOR A3.... HAVE THESE CHANGES
 // ASSUME FILE EXISTS
-int watdfs_cli_transfer_file(void *userdata, const char *path) {
+int watdfs_cli_transfer_file(void *userdata, const char *path, struct fuse_file_info *fi) {
     // GET ATTR
     struct stat statbuf{};
 
     int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-
-    HANDLE_RET(fn_ret)
+    HANDLE_RET("getattr rpc failed in transfer", fn_ret)
 
     // TRUNCATE FILE TO DESIRED SIZE
     std::string full_path = full_cache_path(path);
     fn_ret = truncate(full_path.c_str(), statbuf.st_size);
-
-    HANDLE_RET(fn_ret)
+    HANDLE_RET("client side truncate failed in cli_transfer", fn_ret)
 
     // READ FILE INTO CACHE 
     char buf[statbuf.st_size];
-    struct fuse_file_info fi{};
+    // struct fuse_file_info fi{};
+    // fi.flags = O_CREAT | O_RDONLY;
+    fn_ret = a2::watdfs_cli_open(userdata, path, fi);
+    HANDLE_RET("open failed in cli_transfer", fn_ret)
 
-    fi.flags
-
-    fn_ret = a2::watdfs_cli_open(userdata, path, &fi);
-    HANDLE_RET(fn_ret)
-
-    fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, &fi);
-    HANDLE_RET(fn_ret)
+    fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
+    HANDLE_RET("cli_read rpc failed in cli_transfer", fn_ret)
 
     // write to client
     int fd = open(full_path.c_str(), O_RDWR | O_CREAT);
     fn_ret = write(fd, buf, statbuf.st_size);
-
-    HANDLE_RET(fn_ret);
+    HANDLE_RET("client open and write failed in cli_transfer", fn_ret)
 
     // update file metadata(?) TODO
     // update times? 
-    // Idk if this breaks anything... May want to comment for now
-    // chmod(full_path.c_str(), statbuf.st_mode);
-    // chown(full_path.c_str(), statbuf.st_uid, statbuf.st_gid);
+    struct timespec times[2] = { statbuf.st_atimespec, statbuf.st_mtimespec };
+    fn_ret = utimensat(fd, full_path.c_str(), times, 0);
+    HANDLE_RET("updating metadata on client file failed in cli_transfer", fn_ret)
+
+    fn_ret = close(fd);
+    HANDLE_RET("client close failed in cli_transfer", fn_ret)
     return 0;
 }
 
 // ASSUMES THAT THE FILE IS IN THE CORRECT PATH
-int watdfs_server_flush_file(void *userdata, const char *path) {
-
+int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_info *fi) {
     // get file locally
     std::string full_path = full_cache_path(path);
 
     // read into buf
     struct stat statbuf{};
     int fn_ret = stat(full_path.c_str(), &statbuf);
-    HANDLE_RET(fn_ret)
+    HANDLE_RET("client stat failed in flush_file", fn_ret)
     int fd = open(full_path.c_str(), O_RDONLY);
-    int buf[statbuf.st_size];
-    read(fd, (void *)buf, statbuf.st_size);
+    char buf[statbuf.st_size];
+
+    fn_ret = read(fd, (void *)buf, statbuf.st_size);
+    HANDLE_RET("client local read failed in flush_file", fn_ret)
+
+    // need to open it on the server
+    // struct fuse_file_info fi{};
+    // fi.flags = O_CREAT | O_WRONLY;
+    // fn_ret = a2::watdfs_cli_open(userdata, path, &fi);
+    // HANDLE_RET("getting file failed in flush_file", fn_ret)
 
     // write buf on server
     // todo fix fuse_file_info
-    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, nullptr);
-    HANDLE_RET(fn_ret)
+    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, fi);
+    HANDLE_RET("write rpc failed in flush_file", fn_ret)
 
     // update times on server
     struct timespec times[2] = { statbuf.st_atimespec, statbuf.st_mtimespec };
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
+    HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
+    // close on the server
+    fn_ret = a2::watdfs_cli_release(userdata, path, fi);
+    HANDLE_RET("close rpc failed in flush_file", fn_ret)
     return 0;
 }
 
@@ -162,284 +183,51 @@ void watdfs_cli_destroy(void *userdata) {
 
 // GET FILE ATTRIBUTES
 int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
-    // SET UP THE RPC CALL
-    DLOG("watdfs_cli_getattr called for '%s'", path);
+    // file can:
+    // - not exist on server, propagate error
+    // - exist on server, not "fresh" on client,
+    //   - so bring it over, and then return attr
+
+    if (!watdfs_cli_fresh_file(path)) {
+        // get file from server
+    }
+
+    // else, file is fresh and on client. get attr and return it
     
-    // getattr has 3 arguments.
-    int ARG_COUNT = 3;
-
-    // Allocate space for the output arguments.
-    void **args = new void*[ARG_COUNT];
-
-    // Allocate the space for arg types, and one extra space for the null
-    // array element.
-    int arg_types[ARG_COUNT + 1];
-
-    // The path has string length (strlen) + 1 (for the null character).
-    int pathlen = strlen(path) + 1;
-
-    // Fill in the arguments
-    // The first argument is the path, it is an input only argument, and a char
-    // array. The length of the array is the length of the path.
-    arg_types[0] =
-        (1u << ARG_INPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) | (uint) pathlen;
-    // For arrays the argument is the array pointer, not a pointer to a pointer.
-    args[0] = (void *)path;
-
-    // The second argument is the stat structure. This argument is an output
-    // only argument, and we treat it as a char array. The length of the array
-    // is the size of the stat structure, which we can determine with sizeof.
-    arg_types[1] = (1u << ARG_OUTPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) |
-                   (uint) sizeof(struct stat); // statbuf
-    args[1] = (void *)statbuf;
-
-    // The third argument is the return code, an output only argument, which is
-    // an integer.
-    // TODO: fill in this argument type.
-    arg_types[2] = (1u << ARG_OUTPUT) | (ARG_INT << 16u);
-
-    // The return code is not an array, so we need to hand args[2] an int*.
-    // The int* could be the address of an integer located on the stack, or use
-    // a heap allocated integer, in which case it should be freed.
-    // TODO: Fill in the argument
-    int retcode = 0;
-    args[2] = (void *)&retcode;
-
-    // Finally, the last position of the arg types is 0. There is no
-    // corresponding arg.
-    arg_types[3] = 0;
-
-    // MAKE THE RPC CALL
-    int rpc_ret = rpcCall((char *)"getattr", arg_types, args);
-
-    // HANDLE THE RETURN
-    // The integer value watdfs_cli_getattr will return.
-    int fxn_ret = 0;
-    if (rpc_ret < 0) {
-        DLOG("getattr rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // Our RPC call succeeded. However, it's possible that the return code
-        // from the server is not 0, that is it may be -errno. Therefore, we
-        // should set our function return value to the retcode from the server.
-
-        // TODO: set the function return value to the return code from the server.
-        fxn_ret = retcode;
-    }
-
-    if (fxn_ret < 0) {
-        // If the return code of watdfs_cli_getattr is negative (an error), then 
-        // we need to make sure that the stat structure is filled with 0s. Otherwise,
-        // FUSE will be confused by the contradicting return values.
-        memset(statbuf, 0, sizeof(struct stat));
-    }
-
-    // Clean up the memory we have allocated.
-    delete []args;
-
-    // Finally return the value we got from the server.
-    return fxn_ret;
+    return a2::watdfs_cli_getattr(userdata, path, statbuf);
 }
 
 // CREATE, OPEN AND CLOSE
 int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
-    // Called to create a file.
-
-    // boilerplate
-    MAKE_CLIENT_ARGS(4, path);
-
-    // mode
-    arg_types[1] = encode_arg_type(true, false, false, ARG_INT, 0);
-    args[1] = VOIDIFY(&mode);
-
-    // dev
-    arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
-    args[2] = VOIDIFY(&dev);
-
-    // make rpc call
-    int rpc_ret = RPCIFY("mknod");
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("mknod rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
+    return a2::watdfs_cli_mknod(userdata, path, mode, dev);
 }
 
 int watdfs_cli_open(void *userdata, const char *path,
                     struct fuse_file_info *fi) {
-    // Called during open.
-    // You should fill in fi->fh.
-    MAKE_CLIENT_ARGS(3, path);
+    // bring the file over to client if needed
+    int fn_ret = watdfs_cli_transfer_file(userdata, path, fi);
+    HANDLE_RET("watdfs_cli_open failed", fn_ret)
 
-    // fi arg
-    arg_types[1] = encode_arg_type(true, true, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
-    args[1] = VOIDIFY(fi);
+    // open file locally and return file descriptor
+    std::string full_path = full_cache_path(path);
+    int local_fd = open(full_path.c_str(), fi->flags);
+    fi->fh = local_fd;
 
-    int rpc_ret = RPCIFY("open");
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("open rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
+    return 0;
 }
 
 int watdfs_cli_release(void *userdata, const char *path,
                        struct fuse_file_info *fi) {
-    // Called during close, but possibly asynchronously.
-    // Called during open.
-    // You should fill in fi->fh.
-    MAKE_CLIENT_ARGS(3, path);
+    // TODO
+    int fn_ret = close(fi->fh);
 
-    // fi arg
-    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
-    args[1] = VOIDIFY(fi);
-
-    int rpc_ret = RPCIFY("release");
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("release rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        fxn_ret = retcode;
+    // flush to server if the file had any write operations
+    if (fi->flags & (O_RDWR | O_WRONLY)) {
+        fn_ret = watdfs_server_flush_file(userdata, path, fi);
+        HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
 
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
-}
-
-int watdfs_read_write_single(
-    void *userdata, 
-    const char *path, 
-    char *buf, 
-    size_t size,
-    off_t offset, 
-    struct fuse_file_info *fi,
-    bool is_read)
-{
-    // put it here
-    // size < MAX_ARRAY_LEN
-    MAKE_CLIENT_ARGS(6, path);
-
-    // buf
-    if (is_read) {
-        arg_types[1] = encode_arg_type(false, true, true, ARG_CHAR, size);
-    } else {
-        arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, size);
-    }
-    args[1] = VOIDIFY(buf);
-
-    // size
-    arg_types[2] = encode_arg_type(true, false, false, ARG_LONG, 0);
-    args[2] = VOIDIFY(&size);
-
-    // offset
-    arg_types[3] = encode_arg_type(true, false, false, ARG_LONG, 0);
-    args[3] = VOIDIFY(&offset);
-
-    // fi
-    arg_types[4] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
-    args[4] = VOIDIFY(fi);
-
-    int rpc_ret = 0;
-    if (is_read) {
-        rpc_ret = RPCIFY("read");
-    } else {
-        rpc_ret = RPCIFY("write");
-    } 
-
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        if (is_read)
-            DLOG("read rpc failed with error '%d'", rpc_ret);
-        else
-            DLOG("write rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        if (is_read)
-            DLOG("read operation itself failed with err code %d", retcode);
-        else
-            DLOG("write operation itself failed with err code %d", retcode);
-        
-        // fine!
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
-}
-
-// uses "read" but is really either read or write
-int watdfs_read_write_full(
-    void *userdata,
-    const char *path,
-    char *buf, 
-    size_t size,
-    off_t offset,
-    struct fuse_file_info *fi,
-    bool is_read
-)
-{
-    size_t temp_left_to_read = size;
-    off_t temp_offset = offset;
-    char * temp_buf = buf;
-    int rpc_ret, fxn_ret;
-    fxn_ret = 0;
-    while (temp_left_to_read > 0) {
-        size_t to_read = std::min((size_t)MAX_ARRAY_LEN, temp_left_to_read);
-        DLOG("to_read, temp_offset is: %ld, %ld", to_read, temp_offset);
-        rpc_ret = watdfs_read_write_single(userdata, path, temp_buf, to_read, temp_offset, fi, is_read);
-        
-        // error handling
-        if (rpc_ret < 0) {
-            DLOG("one of reads or writes went wrong, carrying up the error...");
-            return -EINVAL;
-        } else {
-            // good! add this to fxn_ret
-            fxn_ret += rpc_ret;
-            DLOG("read or write iterated correctly, currently reading %d bytes", fxn_ret);
-        }
-
-        // increment as we loop
-        temp_left_to_read -= to_read;
-        temp_buf += to_read;
-        temp_offset += (off_t)to_read;
-    }
-    return fxn_ret;
+    return 0;
 }
 
 // READ AND WRITE DATA
@@ -449,7 +237,15 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
 
-    return watdfs_read_write_full(userdata, path, buf, size, offset, fi, true);
+    // ASSUMES FILE IS CORRECTLY OPENED ETC AND
+    // fd is in fi->fh
+
+    // TODO 
+    int bytes_read = pread(fi->fh, (void*)buf, size, offset);
+    HANDLE_RET("bytes couldnt properly be read in cli_read", bytes_read);
+
+    // else
+    return bytes_read;
 }
 
 int watdfs_cli_write(void *userdata, const char *path, const char *buf,
@@ -458,95 +254,49 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
 
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
-    return watdfs_read_write_full(userdata, path, (char *)buf, size, offset, fi, false);
+
+    // TODO
+    int bytes_written = pwrite(fi->fh, (void *)buf, size, offset);
+    HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
+
+    return bytes_written;
 }
 
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
-    MAKE_CLIENT_ARGS(3, path);
 
-    // newsize
-    arg_types[1] = encode_arg_type(true, false, false, ARG_LONG, 0);
-    args[1] = VOIDIFY(&newsize);
+    // grab file from server 
+    // idk what to do with fi yet
+    struct fuse_file_info fi{};
 
-    // call rpc 
-    int rpc_ret = RPCIFY("truncate");
-    int fxn_ret = 0;
+    int fn_ret = watdfs_cli_transfer_file(userdata, path, &fi);
+    HANDLE_RET("transferring file failed in cli_truncate", fn_ret)
 
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("truncate rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        DLOG("truncate call itself failed with error '%d'", retcode);
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
+    return fn_ret;
 }
 
 int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
-    // Force a flush of file data.
-    MAKE_CLIENT_ARGS(3, path);
+    // TODO
+    int fn_ret = watdfs_server_flush_file(userdata, path, fi);
+    HANDLE_RET("cli_fsync flush failed", fn_ret)
 
-    // newsize
-    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)sizeof(struct fuse_file_info));
-    args[1] = VOIDIFY(fi);
-
-    // call rpc 
-    int rpc_ret = RPCIFY("fsync");
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("fsync rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        DLOG("fsync call itself failed with error '%d'", retcode);
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
+    return fn_ret;
 }
 
 // CHANGE METADATA
 int watdfs_cli_utimensat(void *userdata, const char *path,
                        const struct timespec ts[2]) {
-    // Change file access and modification times.
-    MAKE_CLIENT_ARGS(3, path);
+    // get file if not on client
+    struct fuse_file_info fi{};
+    int fn_ret = watdfs_cli_transfer_file(userdata, path, &fi);
 
-    // newsize
-    arg_types[1] = encode_arg_type(true, false, true, ARG_CHAR, (uint)2*sizeof(struct timespec));
-    args[1] = VOIDIFY(ts);
+    // get attr ?? using fn call or from scratch, now that file is here
+    // then 
+    
+    // set it locally
+    std::string full_path = full_cache_path(path);
 
-    // call rpc 
-    int rpc_ret = RPCIFY("utimensat");
-    int fxn_ret = 0;
-
-    if (rpc_ret < 0) {
-        // handle errors
-        DLOG("utimensat rpc failed with error '%d'", rpc_ret);
-        // Something went wrong with the rpcCall, return a sensible return
-        // value. In this case lets return, -EINVAL
-        fxn_ret = -EINVAL;
-    } else {
-        // fine!
-        DLOG("utimensat call itself failed with error '%d'", retcode);
-        fxn_ret = retcode;
-    }
-
-    // FREE boilerplate at end
-    FREE_ARGS();
-    return fxn_ret;
+    // flush it to server
+    return -1; // TODO
 }
