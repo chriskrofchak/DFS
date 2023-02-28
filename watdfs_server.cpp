@@ -181,7 +181,7 @@ int watdfs_read(int *argTypes, void **args) {
     int *ret = (int *)args[5];
     *ret = 0;
 
-    DLOG("in watdfs_read: size is %d and offset is %d\n", *sz, *offset);
+    DLOG("in watdfs_read: size is %ld and offset is %ld\n", *sz, *offset);
     int sys_ret = pread(fi->fh, buf, *sz, *offset);
     DLOG("in watdfs_read: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
