@@ -89,7 +89,7 @@ int watdfs_cli_transfer_file(void *userdata, const char *path, struct fuse_file_
 
     // update file metadata(?) TODO
     // update times? 
-    struct timespec times[2] = { statbuf.st_atimespec, statbuf.st_mtimespec };
+    struct timespec times[2] = { statbuf.st_atime, statbuf.st_mtime };
     fn_ret = utimensat(fd, full_path.c_str(), times, 0);
     HANDLE_RET("updating metadata on client file failed in cli_transfer", fn_ret)
 
@@ -125,7 +125,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     HANDLE_RET("write rpc failed in flush_file", fn_ret)
 
     // update times on server
-    struct timespec times[2] = { statbuf.st_atimespec, statbuf.st_mtimespec };
+    struct timespec times[2] = { statbuf.st_atime, statbuf.st_mtime };
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
     HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
     // close on the server
@@ -193,7 +193,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     }
 
     // else, file is fresh and on client. get attr and return it
-    
+
     return a2::watdfs_cli_getattr(userdata, path, statbuf);
 }
 
@@ -290,6 +290,7 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
     // get file if not on client
     struct fuse_file_info fi{};
     int fn_ret = watdfs_cli_transfer_file(userdata, path, &fi);
+    (void)fn_ret; // TODO use later
 
     // get attr ?? using fn call or from scratch, now that file is here
     // then 
