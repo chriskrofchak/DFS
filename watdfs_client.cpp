@@ -148,6 +148,8 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // fn_ret = close(fd);
     // HANDLE_SYS("client first close failed in transfer", fn_ret)
 
+    DLOG("statbuf is showing a size of: %ld", statbuf.st_size);
+    
     // truncate file client side
     fn_ret = ftruncate(fd, statbuf.st_size);
     HANDLE_SYS("client side truncate failed in cli_transfer", fn_ret)
