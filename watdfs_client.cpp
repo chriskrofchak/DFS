@@ -219,6 +219,9 @@ void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
 
     CACHE_PATH = std::string(path_to_cache);
 
+    DLOG("CACHE_PATH INIT TO: %s", CACHE_PATH);
+    DLOG("function full path makes: %s", absolut_path("/fries.txt"));
+
     // TODO: check the return code of the `rpcClientInit` call
     // `rpcClientInit` may fail, for example, if an incorrect port was exported.
     if (rpc_init_ret < 0) {
