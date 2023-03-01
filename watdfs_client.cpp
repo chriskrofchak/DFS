@@ -63,7 +63,7 @@ public:
     int OB_open(std::string filename, int cli_fd, uint64_t cli_flags, int ser_fd, uint64_t ser_flags);
     int OB_close(std::string filename);
     fd_pair get_fd_pair(std::string filename) { return open_files.at(filename); }
-    bool is_open(const char *path); 
+    bool is_open(const char *path) { return open_files.count(std::string(path)); }
 };
 
 int OpenBook::OB_open(
@@ -77,6 +77,11 @@ int OpenBook::OB_open(
     // else 
     fd_pair fdp(cli_fd, ser_fd, cli_flags, ser_flags);
     // open_files.insert({filename, fdp});
+    return 0;
+}
+
+int OpenBook::OB_close(std::string filename) {
+    open_files.erase(filename);
     return 0;
 }
 
