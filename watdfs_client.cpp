@@ -145,17 +145,15 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     std::string full_path = absolut_path(path);
     int fd = open(full_path.c_str(), O_RDWR | O_CREAT);
     HANDLE_SYS("client open failed in cli_transfer", fd)
-    fn_ret = close(fd);
-    HANDLE_SYS("client first close failed in transfer", fn_ret)
+    // fn_ret = close(fd);
+    // HANDLE_SYS("client first close failed in transfer", fn_ret)
 
     // truncate file client side
-    fn_ret = truncate(full_path.c_str(), statbuf.st_size);
+    fn_ret = ftruncate(fd, statbuf.st_size);
     HANDLE_SYS("client side truncate failed in cli_transfer", fn_ret)
     
 
     // write client side
-    fd = open(full_path.c_str(), O_WRONLY);
-    HANDLE_SYS("client open failed in cli_transfer", fn_ret)
     ssize_t b_wrote = write(fd, buf, statbuf.st_size);
     HANDLE_SYS("client write failed in cli_transfer", b_wrote)
 
