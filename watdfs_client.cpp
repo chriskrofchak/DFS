@@ -143,6 +143,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // file may not exist on client side, so just "open" with O_CREAT
     // to create it if it doesnt exist, otherwise this does nothing
     std::string full_path = absolut_path(path);
+    DLOG("FULL_PATH STRING IS: %s", full_path);
     int fd = open(full_path.c_str(), O_RDWR | O_CREAT);
     HANDLE_SYS("client open failed in cli_transfer", fd)
     // fn_ret = close(fd);
