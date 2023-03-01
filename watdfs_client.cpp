@@ -217,11 +217,6 @@ void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
     // TODO: set up the RPC library by calling `rpcClientInit`.
     int rpc_init_ret = rpcClientInit();
 
-    CACHE_PATH = std::string(path_to_cache);
-
-    DLOG("CACHE_PATH INIT TO: %s", CACHE_PATH);
-    DLOG("function full path makes: %s", absolut_path("/fries.txt"));
-
     // TODO: check the return code of the `rpcClientInit` call
     // `rpcClientInit` may fail, for example, if an incorrect port was exported.
     if (rpc_init_ret < 0) {
@@ -244,6 +239,10 @@ void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
     void *userdata = static_cast<void*>(openbook);
 
     // TODO: save `path_to_cache` and `cache_interval` (for A3).
+    CACHE_PATH = std::string(path_to_cache);
+
+    DLOG("CACHE_PATH INIT TO: %s", CACHE_PATH);
+    DLOG("function full path makes: %s", absolut_path("/fries.txt"));
 
     // TODO: set `ret_code` to 0 if everything above succeeded else some appropriate
     // non-zero value.
@@ -270,6 +269,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     // - not exist on server, propagate error
     // - exist on server, not "fresh" on client,
     //   - so bring it over, and then return attr
+    DLOG("cache path string is: %s", CACHE_PATH);
     std::string full_path = absolut_path(path);
     int fn_ret;
 
