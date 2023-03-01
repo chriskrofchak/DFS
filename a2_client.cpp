@@ -1,5 +1,8 @@
 #include "a2_client.h"
-
+#include "rpc.h"
+#include "watdfs_client.h"
+#include "watdfs_make_args.h"
+#include <algorithm>
 
 // GET FILE ATTRIBUTES
 int a2::watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
