@@ -19,6 +19,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 INIT_LOG
 
@@ -83,7 +84,7 @@ int OpenBook::OB_open(
     if (open_files.count(filename)) return -EMFILE; // BAD
     // else 
     fd_pair fdp(cli_fd, ser_fd, cli_flags, ser_flags);
-    open_files.insert({filename, fdp});
+    open_files.insert(std::pair<std::string, fd_pair>(filename, fdp));
     return 0;
 }
 
@@ -126,8 +127,6 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     struct stat statbuf{};
     int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
     DLOG("what's tea here? this should fail since file not on server: %d", fn_ret);
-    // // return -2 anyways
-    // return -2;
     HANDLE_RET("client stat returned error in transfer_file", fn_ret)
 
     // SO, file exists on server, read from it and then 
@@ -390,6 +389,12 @@ int watdfs_cli_release(void *userdata, const char *path,
     // now close
     ob->OB_close(std::string(path));
 
+
+    // need close and a2::watdfs_cli_release
+    // to return
+    // CACHE_MUT.lock(); 
+
+
     // close client  
     fn_ret = close(fi->fh);
     HANDLE_SYS("close client failed in cli_release", fn_ret)
@@ -397,6 +402,7 @@ int watdfs_cli_release(void *userdata, const char *path,
     fn_ret = a2::watdfs_cli_release(userdata, path, &ser_fi);
     HANDLE_RET("server client release failed in cli_release", fn_ret)
 
+    // CACHE_MUT.unlock();
     return 0;
 }
 

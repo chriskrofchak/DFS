@@ -2,12 +2,15 @@
 // Starter code for CS 454/654
 // You SHOULD change this file
 //
+
+// local headers 
 #include "watdfs_make_args.h"
 #include "rpc.h"
 #include "debug.h"
 
 INIT_LOG
 
+// C headers
 #include <fuse.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,11 +18,20 @@ INIT_LOG
 #include <errno.h>
 #include <cstring>
 #include <cstdlib>
+
+// C++ headers
 #include <mutex>
+#include <algorithm>
+#include <string>
+#include <unordered_map>
+// #include <unordered_set>
+#include <utility>
 
 // Global state server_persist_dir.
 char *server_persist_dir = nullptr;
 std::mutex persist_mut{};
+
+ServerBook filebook{};
 
 #define PROLOGUE                                   \
     char *short_path = (char *)args[0];            \
@@ -33,6 +45,89 @@ std::mutex persist_mut{};
 #define RPC_REG(fn_string, fn_name) rpcRegister((char *)fn_string, arg_types, fn_name)
 
 #define UPDATE_RET if (sys_ret < 0) *ret = -errno
+
+
+
+
+
+
+// thread safe file tracker using mutex m
+class ServerBook {
+    std::mutex m;
+    std::unordered_multimap<std::string, int> open_files;
+    std::unordered_map<std::string, int>  write_fd;
+public:
+    ServerBook() {}
+    // ~ServerBook() {}
+
+    // so you can lock and unlock it
+    void lock() { m.lock(); }
+    void unlock() { m.unlock(); }
+
+    // 
+    bool is_file_open(std::string path) {
+        return (open_files.count(path) > 0);
+    }
+    bool is_file_open(const char *path) {
+        return is_file_open(std::string(path));
+    }
+
+    // should always be same fd
+    int get_fd(std::string path) {
+        return open_files.find(path)->second;
+    }
+    int get_fd(const char *path) {
+        return get_fd(std::string(path));
+    }
+
+    // overload two
+    void open_file(std::string path, int fd, int mode) {
+        // m.lock();
+        bool is_write = (mode & (O_RDWR | O_WRONLY)) != 0;
+        open_files.insert(std::pair<std::string, int>(path, fd));
+        if (is_write)
+            write_fd.insert(std::pair<std::string, int>(path, fd));
+        // m.unlock();
+    }
+    void open_file(const char *path, int fd, int mode) {
+        open_file(std::string(path), fd, mode);
+    }
+
+    // overload two
+    void close_file(std::string path, int fd, int mode) {
+        // m.lock();
+        if (!open_files.count(path)) return; // just so no segfault...
+
+        std::unordered_multimap<std::string, int>::iterator it = open_files.find(path);
+        open_files.erase(it); // erases one element
+
+        if ((mode & (O_RDWR | O_WRONLY)) && write_fd.count(path)) {
+            if (fd == write_fd.at(path)) write_fd.erase(path);
+        }
+        // m.unlock();
+        return;
+    }
+
+    void close_file(const char *path, int fd, int mode) {
+        close_file(std::string(path), fd, mode);
+    }
+
+    // open for write, overload two 
+    bool is_open_for_write(std::string path) {
+        bool ret = false;
+        // m.lock();
+        if (open_files.count(path)) ret = write_fd.count(path);
+        // m.unlock();
+        // else not in map, so not open
+        return ret;
+    }
+    bool is_open_for_write(const char *path) {
+        return is_open_for_write(std::string(path));
+    }
+};
+
+
+
 
 // Important: the server needs to handle multiple concurrent client requests.
 // You have to be carefuly in handling global variables, esp. for updating them.
@@ -135,13 +230,31 @@ int watdfs_open(int *argTypes, void **args) {
     int *ret = (int *)args[2];
     *ret = 0;
 
-    // actual syscall
-    int fd = open(full_path, fi->flags);
+    bool want_write = (fi->flags & (O_RDWR | O_WRONLY)) != 0; 
 
-    if (fd < 0) *ret = -errno;
-
-    // else, fill in file descriptor to fi
-    fi->fh = fd;
+    filebook.lock();
+    if (want_write && filebook.is_open_for_write(short_path)) {
+        filebook.unlock();
+        // return ;
+        *ret = -EACCES;
+        // return 0;
+    } else {
+        // either not open for write, 
+        // or we don't want to open for write
+        // file could be open or not -- need to figure out what to do
+        int fd;
+        if (filebook.is_file_open(short_path)) {
+            // just give it the fd that's open
+            fd = filebook.get_fd(short_path);
+        } else {
+            fd = open(full_path, fi->flags);
+        }
+        filebook.open_file(short_path, fd, fi->flags);
+        filebook.unlock();
+        if (fd < 0) *ret = -errno;
+        // else, fill in file descriptor to fi
+        fi->fh = fd;
+    }
 
     EPILOGUE(ret, "watdfs_open");
     return 0;
@@ -157,8 +270,13 @@ int watdfs_release(int *argTypes, void **args) {
     int *ret = (int *)args[2];
     *ret = 0;
 
+    // critical section, make sure that updating this metdata
+    // is atomic
+    filebook.lock();
     // actual syscall
     int sys_ret = close(fi->fh);
+    filebook.close_file(short_path, fi->fh, fi->flags);
+    filebook.unlock();
 
     UPDATE_RET;
 
