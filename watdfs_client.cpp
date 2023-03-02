@@ -126,7 +126,6 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // getattr
     struct stat statbuf{};
     int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-    DLOG("what's tea here? this should fail since file not on server: %d", fn_ret);
     HANDLE_RET("client stat returned error in transfer_file", fn_ret)
 
     // SO, file exists on server, read from it and then 

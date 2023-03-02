@@ -31,8 +31,6 @@ INIT_LOG
 char *server_persist_dir = nullptr;
 std::mutex persist_mut{};
 
-ServerBook filebook{};
-
 #define PROLOGUE                                   \
     char *short_path = (char *)args[0];            \
     char *full_path  = get_full_path(short_path)
@@ -83,6 +81,7 @@ public:
     // overload two
     void open_file(std::string path, int fd, int mode) {
         // m.lock();
+        DLOG("filebook.open_file called on file: %s", path.c_str());
         bool is_write = (mode & (O_RDWR | O_WRONLY)) != 0;
         open_files.insert(std::pair<std::string, int>(path, fd));
         if (is_write)
@@ -96,6 +95,7 @@ public:
     // overload two
     void close_file(std::string path, int fd, int mode) {
         // m.lock();
+        DLOG("filebook.close_file called on file: %s", path.c_str());
         if (!open_files.count(path)) return; // just so no segfault...
 
         std::unordered_multimap<std::string, int>::iterator it = open_files.find(path);
@@ -126,7 +126,8 @@ public:
     }
 };
 
-
+// used to keep state on server side
+ServerBook filebook{};
 
 
 // Important: the server needs to handle multiple concurrent client requests.
@@ -247,11 +248,17 @@ int watdfs_open(int *argTypes, void **args) {
             // just give it the fd that's open
             fd = filebook.get_fd(short_path);
         } else {
+            DLOG("in server_open, the old fashioned way.");
             fd = open(full_path, fi->flags);
         }
-        filebook.open_file(short_path, fd, fi->flags);
+        if (fd < 0) {
+            *ret = -errno;
+        } else {
+            // if there was an error we dont want to open file 
+            // and mess up the count
+            filebook.open_file(short_path, fd, fi->flags);
+        }
         filebook.unlock();
-        if (fd < 0) *ret = -errno;
         // else, fill in file descriptor to fi
         fi->fh = fd;
     }
