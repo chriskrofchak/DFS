@@ -386,14 +386,6 @@ int watdfs_cli_release(void *userdata, const char *path,
         HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
 
-    // now close
-    ob->OB_close(std::string(path));
-
-
-    // need close and a2::watdfs_cli_release
-    // to return
-    // CACHE_MUT.lock(); 
-
 
     // close client  
     fn_ret = close(fi->fh);
@@ -402,7 +394,11 @@ int watdfs_cli_release(void *userdata, const char *path,
     fn_ret = a2::watdfs_cli_release(userdata, path, &ser_fi);
     HANDLE_RET("server client release failed in cli_release", fn_ret)
 
-    // CACHE_MUT.unlock();
+    // now close
+    // this should make sure -EMFILE keeps getting returned until release returns
+    CACHE_MUT.lock();
+    ob->OB_close(std::string(path));
+    CACHE_MUT.unlock();
     return 0;
 }
 
