@@ -1,6 +1,6 @@
 import os
 
 user_ = os.environ.get("USER")
-res = os.mknod("/tmp/" + user_ + "/mount/myfilea3_stat.txt")
+res = os.mknod("/tmp/" + user_ + "/mount/stat55.txt")
 
 print(res)

@@ -54,15 +54,22 @@ struct fd_pair {
 
 class OpenBook {
     // map for filename, client file descriptor fd, and client flags.
+    std::string cache_path_;
+    time_t cache_int_;
     std::unordered_map<std::string, fd_pair> open_files;
 public:
-    OpenBook() : open_files() {}
+    OpenBook(const char* path, time_t cache_int) : 
+        cache_path_(std::string(path)),
+        cache_int_(cache_int),
+        open_files() {}
     ~OpenBook() {}
 
     // open and close adds and removes from OpenBook
     int OB_open(std::string filename, int cli_fd, uint64_t cli_flags, int ser_fd, uint64_t ser_flags);
     int OB_close(std::string filename);
     fd_pair get_fd_pair(std::string filename) { return open_files.at(filename); }
+    std::string get_cache() { return cache_path_; }
+    time_t get_interval() { return cache_int_; }
     bool is_open(const char *path) { return open_files.count(std::string(path)); }
 };
 
@@ -86,16 +93,18 @@ int OpenBook::OB_close(std::string filename) {
 }
 
 bool watdfs_cli_fresh_file(const char *path) {
-    return false; // we always want to bring it over
     // (for testing before freshness checks)
     // TODO CHANGE BACK
-    // struct stat statbuf{};
-    // int fn_ret = stat(path, &statbuf);
-    // if (fn_ret < 0) {
-    //     if (fn_ret == -ENOENT) return false;
-    // }
-    // // to do, freshness checks
-    // return true;
+    struct stat statbuf{};
+    int fn_ret = stat(path, &statbuf);
+    if (fn_ret < 0) {
+        DLOG("in watdfs_cli_fresh_file with errno %d", -errno);
+        if (errno == ENOENT) return false;
+    } else {
+        DLOG("in watdfs_cli_fresh_file on %s, and file exists already...", path);
+    }
+    // to do, freshness checks
+    return true; // file exists
 }
 
 bool is_file_open(void *userdata, const char* path) {
@@ -112,6 +121,9 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // getattr
     struct stat statbuf{};
     int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
+    DLOG("what's tea here? this should fail since file not on server: %d", fn_ret);
+    // // return -2 anyways
+    // return -2;
     HANDLE_RET("client stat returned error in transfer_file", fn_ret)
 
     // SO, file exists on server, read from it and then 
@@ -125,6 +137,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     
     char buf[statbuf.st_size];
     if (fi->flags & O_WRONLY) fi->flags = (fi->flags & ~O_WRONLY) | O_RDWR; // since we need to read too
+
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
     HANDLE_RET("open failed in cli_transfer", fn_ret) // this errror is normal if ENOFILE
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
@@ -143,9 +156,13 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // file may not exist on client side, so just "open" with O_CREAT
     // to create it if it doesnt exist, otherwise this does nothing
     std::string full_path = absolut_path(path);
-    DLOG("FULL_PATH STRING IS: %s", full_path);
-    int fd = open(full_path.c_str(), O_RDWR | O_CREAT);
+    DLOG("FULL_PATH STRING IS: %s", full_path.c_str());
+    fn_ret = mknod(full_path.c_str(), statbuf.st_mode, statbuf.st_dev);
+    HANDLE_SYS("client mknod failed in cli_transfer", fn_ret)
+
+    int fd = open(full_path.c_str(), O_WRONLY);
     HANDLE_SYS("client open failed in cli_transfer", fd)
+
     // fn_ret = close(fd);
     // HANDLE_SYS("client first close failed in transfer", fn_ret)
 
@@ -154,7 +171,6 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // truncate file client side
     fn_ret = ftruncate(fd, statbuf.st_size);
     HANDLE_SYS("client side truncate failed in cli_transfer", fn_ret)
-    
 
     // write client side
     ssize_t b_wrote = write(fd, buf, statbuf.st_size);
@@ -162,8 +178,8 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
 
     // update file metadata(?) TODO
     // update times? 
-    struct timespec times[2] = { statbuf.st_atime, statbuf.st_mtime };
-    fn_ret = utimensat(fd, full_path.c_str(), times, 0);
+    struct timespec times[2] = { statbuf.st_atim, statbuf.st_mtim };
+    fn_ret = futimens(fd, times);
     HANDLE_SYS("updating metadata on client file failed in cli_transfer", fn_ret)
 
     fn_ret = close(fd);
@@ -185,7 +201,14 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     
     // if its in OpenBook, should close it and reopen as readonly 
     // to send to server... 
-    int fd = open(full_path.c_str(), O_RDONLY);
+    OpenBook* ob = static_cast<OpenBook*>(userdata);
+    int fd;
+    if (ob->is_open(path)) {
+        fd = ob->get_fd_pair(std::string(path)).cli_fd; 
+    } else {
+        int fd = open(full_path.c_str(), O_RDONLY);
+        HANDLE_SYS("opening file in flush_file failed", fd)
+    }
     char buf[statbuf.st_size];
 
     ssize_t b_read = read(fd, (void *)buf, statbuf.st_size);
@@ -235,14 +258,14 @@ void *watdfs_cli_init(struct fuse_conn_info *conn, const char *path_to_cache,
     // TODO Initialize any global state that you require for the assignment and return it.
     // The value that you return here will be passed as userdata in other functions.
     // In A1, you might not need it, so you can return `nullptr`.
-    OpenBook *openbook = new OpenBook();
+    OpenBook *openbook = new OpenBook(path_to_cache, cache_interval);
     void *userdata = static_cast<void*>(openbook);
 
     // TODO: save `path_to_cache` and `cache_interval` (for A3).
     CACHE_PATH = std::string(path_to_cache);
 
-    DLOG("CACHE_PATH INIT TO: %s", CACHE_PATH);
-    DLOG("function full path makes: %s", absolut_path("/fries.txt"));
+    DLOG("CACHE_PATH INIT TO: %s", CACHE_PATH.c_str());
+    DLOG("function full path makes: %s", absolut_path("/fries.txt").c_str());
 
     // TODO: set `ret_code` to 0 if everything above succeeded else some appropriate
     // non-zero value.
@@ -265,15 +288,18 @@ void watdfs_cli_destroy(void *userdata) {
 
 // GET FILE ATTRIBUTES
 int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
+
+    // return a2::watdfs_cli_getattr(userdata, path, statbuf);
     // file can:
     // - not exist on server, propagate error
     // - exist on server, not "fresh" on client,
     //   - so bring it over, and then return attr
-    DLOG("cache path string is: %s", CACHE_PATH);
+    // DLOG("cache path string is: %s", CACHE_PATH.c_str());
+    // if this doesnt work try userdata 
     std::string full_path = absolut_path(path);
     int fn_ret;
 
-    if (!watdfs_cli_fresh_file(path)) {
+    if (!watdfs_cli_fresh_file(full_path.c_str())) {
         // get file from server
         struct fuse_file_info fi{};
         fi.flags = O_RDONLY;
@@ -284,7 +310,6 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
 
     // else, file is fresh and on client. get attr and return it
     fn_ret = stat(full_path.c_str(), statbuf);
-
     return fn_ret;
 }
 
@@ -292,7 +317,8 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
 int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     struct stat statbuf{};
     // file exists already, locally
-    if (watdfs_cli_fresh_file(path) || !stat(path, &statbuf)) return -EEXIST;
+    std::string full_path = absolut_path(path);
+    if (watdfs_cli_fresh_file(full_path.c_str()) || !stat(full_path.c_str(), &statbuf)) return -EEXIST;
 
     int fn_ret = a2::watdfs_cli_mknod(userdata, path, mode, dev);
     HANDLE_RET("error returned from mknod rpc, maybe file exists", fn_ret)
@@ -303,8 +329,6 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     fi.flags = O_RDONLY;
     fn_ret = transfer_file(userdata, path, false, &fi);
     HANDLE_RET("error making file locally cli_mknod", fn_ret)
-
-    // good and done, return the transfer return
     return fn_ret;
 }
 
