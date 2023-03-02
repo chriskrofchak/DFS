@@ -83,7 +83,7 @@ int OpenBook::OB_open(
     if (open_files.count(filename)) return -EMFILE; // BAD
     // else 
     fd_pair fdp(cli_fd, ser_fd, cli_flags, ser_flags);
-    // open_files.insert({filename, fdp});
+    open_files.insert({filename, fdp});
     return 0;
 }
 
@@ -92,9 +92,7 @@ int OpenBook::OB_close(std::string filename) {
     return 0;
 }
 
-bool watdfs_cli_fresh_file(const char *path) {
-    // (for testing before freshness checks)
-    // TODO CHANGE BACK
+bool watdfs_cli_file_exists(const char *path) {
     struct stat statbuf{};
     int fn_ret = stat(path, &statbuf);
     if (fn_ret < 0) {
@@ -105,6 +103,12 @@ bool watdfs_cli_fresh_file(const char *path) {
     }
     // to do, freshness checks
     return true; // file exists
+}
+
+bool watdfs_cli_fresh_file(const char *path) {
+    // (for testing before freshness checks)
+    // TODO CHANGE BACK
+    return watdfs_cli_file_exists(path); // for now
 }
 
 bool is_file_open(void *userdata, const char* path) {
@@ -156,9 +160,12 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // file may not exist on client side, so just "open" with O_CREAT
     // to create it if it doesnt exist, otherwise this does nothing
     std::string full_path = absolut_path(path);
-    DLOG("FULL_PATH STRING IS: %s", full_path.c_str());
-    fn_ret = mknod(full_path.c_str(), statbuf.st_mode, statbuf.st_dev);
-    HANDLE_SYS("client mknod failed in cli_transfer", fn_ret)
+
+    // DLOG("FULL_PATH STRING IS: %s", full_path.c_str());
+    if (!watdfs_cli_file_exists(full_path.c_str())) {
+        fn_ret = mknod(full_path.c_str(), statbuf.st_mode, statbuf.st_dev);
+        HANDLE_SYS("client mknod failed in cli_transfer", fn_ret)
+    }
 
     int fd = open(full_path.c_str(), O_WRONLY);
     HANDLE_SYS("client open failed in cli_transfer", fd)
@@ -212,7 +219,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     char buf[statbuf.st_size];
 
     ssize_t b_read = read(fd, (void *)buf, statbuf.st_size);
-    HANDLE_RET("client local read failed in flush_file", b_read)
+    HANDLE_SYS("client local read failed in flush_file", b_read)
 
     // NO OPEN because file should ALREADY BE OPEN if you're WRITING TO IT
     // subject to change...
@@ -223,7 +230,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     HANDLE_RET("write rpc failed in flush_file", fn_ret)
 
     // update times on server
-    struct timespec times[2] = { statbuf.st_atime, statbuf.st_mtime };
+    struct timespec times[2] = { statbuf.st_atim, statbuf.st_mtim };
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
     HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
 
@@ -367,7 +374,6 @@ int watdfs_cli_release(void *userdata, const char *path,
     // get metadata
     OpenBook *ob = static_cast<OpenBook *>(userdata);
     fd_pair fdp = ob->get_fd_pair(std::string(path));
-    ob->OB_close(std::string(path));
 
     // make server file info
     struct fuse_file_info ser_fi{};
@@ -380,6 +386,9 @@ int watdfs_cli_release(void *userdata, const char *path,
         fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
         HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
+
+    // now close
+    ob->OB_close(std::string(path));
 
     // close client  
     fn_ret = close(fi->fh);
