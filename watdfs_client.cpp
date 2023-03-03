@@ -312,7 +312,12 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
 
     // write buf on server
     // todo fix fuse_file_info
+    int ser_fd = ob->get_fd_pair(std::string(path)).ser_fd;
+    int temp_fd_ = fi->fh;
+    fi->fh = ser_fd; // for server
     fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, fi);
+    // now restore fi->fh
+    fi->fh = temp_fd_;
     RLS_IF_ERR(fn_ret, true);
     HANDLE_RET("write rpc failed in flush_file", fn_ret)
 
