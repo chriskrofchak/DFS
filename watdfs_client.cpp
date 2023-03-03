@@ -117,6 +117,65 @@ bool is_file_open(void *userdata, const char* path) {
     return openbook->is_open(path);
 }
 
+// FOR ATOMIC FILE TRANSFERS
+int watdfs_get_rw_lock(bool is_write) {
+    // will return 0 if you get the lock
+    void **args = new void*[2];
+    int arg_types[3];
+
+    int lock_mode = is_write ? 1 : 0; // 1 for write, 0 for read
+
+    // lock mode
+    arg_types[0] = encode_arg_type(true, false, false, ARG_INT, 0);
+    args[0] = (void*)(&lock_mode);
+
+    int retcode = 0;
+    // return value
+    arg_types[1] = encode_retcode();
+    args[1] = (void *)&retcode; // set retcode to 0 initially...
+
+    arg_types[2] = 0; // null terminate arg_types
+
+    int rpc_ret = RPCIFY("get_rw_lock");
+    if (rpc_ret < 0) {
+        DLOG("rpc call get_rw_lock failed!");
+        retcode = -EINVAL; // to know that rpc failed...
+    }
+
+    // else delete args and return retcode as normal 
+    delete[] args;
+    return retcode;
+}
+
+int watdfs_release_rw_lock(bool is_write) {
+    // will return 0 if successfully released the lock
+    // will return 0 if you get the lock
+    void **args = new void*[2];
+    int arg_types[3];
+
+    int lock_mode = is_write ? 1 : 0; // 1 for write, 0 for read
+
+    // lock mode
+    arg_types[0] = encode_arg_type(true, false, false, ARG_INT, 0);
+    args[0] = (void*)(&lock_mode);
+
+    int retcode = 0;
+    // return value
+    arg_types[1] = encode_retcode();
+    args[1] = (void *)&retcode; // set retcode to 0 initially...
+
+    arg_types[2] = 0; // null terminate arg_types
+
+    int rpc_ret = RPCIFY("release_rw_lock");
+    if (rpc_ret < 0) {
+        DLOG("rpc call release_rw_lock failed!");
+        retcode = -EINVAL; // to know that rpc failed...
+    }
+
+    delete[] args;
+    return retcode;
+}
+
 // NOW FOR A3.... HAVE THESE CHANGES
 // not done when file is already open,
 int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse_file_info *fi) {

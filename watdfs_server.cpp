@@ -130,6 +130,16 @@ public:
 ServerBook filebook{};
 
 
+///////////////
+// ATOMIC FILE TRANSFER
+
+int watdfs_rw_acquire(int *argTypes, void **args) {
+}
+
+int watdfs_rw_release(int *argTypes, void **args) {
+}
+
+
 // Important: the server needs to handle multiple concurrent client requests.
 // You have to be carefuly in handling global variables, esp. for updating them.
 // Hint: use locks before you update any global variable.
@@ -557,6 +567,26 @@ int main(int argc, char *argv[]) {
         ret = RPC_REG("utimensat", watdfs_utimensat);
 
         if (ret < 0) return ret;
+    }
+
+    // get_rw_lock
+    {
+        int arg_types[3];
+        arg_types[0] = encode_arg_type(true, false, false, ARG_INT, 0);
+        arg_types[1] = encode_retcode();
+        arg_types[2] = 0; // null terminated
+
+        int ret = RPC_REG("get_rw_lock", watdfs_rw_acquire);
+    }
+
+    // release_rw_lock
+    {
+        int arg_types[3];
+        arg_types[0] = encode_arg_type(true, false, false, ARG_INT, 0);
+        arg_types[1] = encode_retcode();
+        arg_types[2] = 0; // null terminated
+
+        int ret = RPC_REG("release_rw_lock", watdfs_rw_release);
     }
 
     // TODO: Hand over control to the RPC library by calling `rpcExecute`.
