@@ -42,7 +42,7 @@ std::string absolut_path(const char* path) {
       return -errno;                                                                 \
   }
 
-#define RLS_IF_ERR(fn_ret, is_write) if (fn_ret < 0) watdfs_release_rw_lock(is_write)
+#define RLS_IF_ERR(fn_ret, is_write) if (fn_ret < 0) watdfs_release_rw_lock(path, is_write)
 
 struct fd_pair {
     int cli_fd, ser_fd;
@@ -205,7 +205,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     
     ////// CRITICAL SECTION
     // TODO: decide if you need to spin or not
-    fn_ret = watdfs_get_rw_lock(is_write);
+    fn_ret = watdfs_get_rw_lock(path, is_write);
 
     DLOG("this is fi->flags & O_CREAT, shouldn't be 0 if O_CREAT passed: %d", fi->flags & O_CREAT);
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
@@ -234,7 +234,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
         HANDLE_RET("cli_release in transfer failed", fn_ret)
     }
 
-    fn_ret = watdfs_release_rw_lock(is_write);
+    fn_ret = watdfs_release_rw_lock(path, is_write);
     //// END OF CRITICAL SECTION
 
     //////////
