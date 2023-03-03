@@ -313,11 +313,13 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // write buf on server
     // todo fix fuse_file_info
     fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, fi);
+    RLS_IF_ERR(fn_ret, true);
     HANDLE_RET("write rpc failed in flush_file", fn_ret)
 
     // update times on server
     struct timespec times[2] = { statbuf.st_atim, statbuf.st_mtim };
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
+    RLS_IF_ERR(fn_ret, true);
     HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
 
     // can release lock
