@@ -5,7 +5,7 @@
 
 ///// ENCODING FUNCTIONS
 int encode_arg_path(const char* path) {
-    return (1u << ARG_INPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) | (uint)strlen(path);
+    return (1u << ARG_INPUT) | (1u << ARG_ARRAY) | (ARG_CHAR << 16u) | (uint)(strlen(path)+1);
 }
 
 int encode_retcode() {
