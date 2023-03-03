@@ -184,44 +184,41 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
 
     // getattr
     struct stat statbuf{};
-    int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-    if ((fi->flags & O_CREAT) == 0)
-        HANDLE_RET("client stat returned error in transfer_file", fn_ret)
-
-    // else, we'll create the file
-
-    // SO, file exists on server, read from it and then 
-    // update client file
-
-    ////////
-    // SERVER FETCH
-
-    //  read 
-    // you can concurrently open in read so this should work even for getattr
-    
-    char buf[statbuf.st_size];
-    if (fi->flags & O_WRONLY) fi->flags = (fi->flags & ~O_WRONLY) | O_RDWR; // since we need to read too
-
+    int fn_ret;
     bool is_write = (fi->flags & (O_WRONLY | O_RDWR)) != 0;
 
+    if (fi->flags & O_WRONLY) fi->flags = (fi->flags & ~O_WRONLY) | O_RDWR; // since we need to read too
+    
+    ////// CRITICAL SECTION
     // TODO: decide if you need to spin or not
     fn_ret = watdfs_get_rw_lock(is_write);
 
-    // this should be atomic
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
-    HANDLE_RET("open failed in cli_transfer", fn_ret) // this errror is normal if ENOFILE
+    HANDLE_RET("open failed in cli_transfer", fn_ret) // this error is normal if ENOFILE, ENOENT
+    
+    // this way, if there was no file but O_CREAT was passed, we keep going
+    fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
+    HANDLE_RET("client stat returned error in transfer_file", fn_ret)
+    
+    char buf[statbuf.st_size];
+
+    // this should be atomic
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
     HANDLE_RET("cli_read rpc failed in cli_transfer", fn_ret)
 
-    fn_ret = watdfs_release_rw_lock(is_write);
 
     
     // if we are just bringing it over to read/ not an open call,
     // we don't need to keep the fd.
     if (!persist_fd) {
         fn_ret = a2::watdfs_cli_release(userdata, path, fi); // close our FD / release
+        if (fn_ret < 0) watdfs_release_rw_lock(is_write);
         HANDLE_RET("cli_release in transfer failed", fn_ret)
     }
+
+    fn_ret = watdfs_release_rw_lock(is_write);
+    //// END OF CRITICAL SECTION
+    
     //////////
     // CLIENT WRITE
 
