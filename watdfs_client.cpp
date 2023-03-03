@@ -42,6 +42,8 @@ std::string absolut_path(const char* path) {
       return -errno;                                                                 \
   }
 
+#define RLS_IF_ERR(fn_ret, is_write) if (fn_ret < 0) watdfs_release_rw_lock(is_write)
+
 struct fd_pair {
     int cli_fd, ser_fd;
     uint64_t cli_flags, ser_flags;
@@ -195,16 +197,19 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
 
     DLOG("this is fi->flags & O_CREAT, shouldn't be 0 if O_CREAT passed: %d", fi->flags & O_CREAT);
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
+    RLS_IF_ERR(fn_ret, is_write);
     HANDLE_RET("open failed in cli_transfer", fn_ret) // this error is normal if ENOFILE, ENOENT
     
     // this way, if there was no file but O_CREAT was passed, we keep going
     fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
+    RLS_IF_ERR(fn_ret, is_write);
     HANDLE_RET("client stat returned error in transfer_file", fn_ret)
     
     char buf[statbuf.st_size];
 
     // this should be atomic
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
+    RLS_IF_ERR(fn_ret, is_write);
     HANDLE_RET("cli_read rpc failed in cli_transfer", fn_ret)
 
 
@@ -213,7 +218,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // we don't need to keep the fd.
     if (!persist_fd) {
         fn_ret = a2::watdfs_cli_release(userdata, path, fi); // close our FD / release
-        if (fn_ret < 0) watdfs_release_rw_lock(is_write);
+        RLS_IF_ERR(fn_ret, is_write);
         HANDLE_RET("cli_release in transfer failed", fn_ret)
     }
 
@@ -421,14 +426,15 @@ int watdfs_cli_open(void *userdata, const char *path,
     ser_fi.flags = fi->flags;
 
     DLOG("in watdfs_cli_open, fi->flags & O_CREAT: %d", fi->flags & O_CREAT);
+    
+    // open file locally and return file descriptor
+    std::string full_path = absolut_path(path);
 
-    if (!watdfs_cli_fresh_file(path)) {
+    if (!watdfs_cli_fresh_file(full_path.c_str())) {
         int fn_ret = transfer_file(userdata, path, true, &ser_fi);
         HANDLE_RET("watdfs_cli_open transfer_file failed", fn_ret)
     }
 
-    // open file locally and return file descriptor
-    std::string full_path = absolut_path(path);
     int local_fd = open(full_path.c_str(), fi->flags);
     HANDLE_SYS("client side open failed", local_fd)
     fi->fh = local_fd;
