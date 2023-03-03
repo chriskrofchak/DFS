@@ -451,6 +451,8 @@ int watdfs_cli_open(void *userdata, const char *path,
         HANDLE_RET("watdfs_cli_open transfer_file failed", fn_ret)
     }
 
+    DLOG("trasnfer was successful, what's the file descriptor for ser_fi? %ld", ser_fi.fh);
+
     int local_fd = open(full_path.c_str(), fi->flags);
     HANDLE_SYS("client side open failed", local_fd)
     fi->fh = local_fd;
