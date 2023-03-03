@@ -193,6 +193,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // TODO: decide if you need to spin or not
     fn_ret = watdfs_get_rw_lock(is_write);
 
+    DLOG("this is fi->flags & O_CREAT, shouldn't be 0 if O_CREAT passed: %d", fi->flags & O_CREAT);
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
     HANDLE_RET("open failed in cli_transfer", fn_ret) // this error is normal if ENOFILE, ENOENT
     
@@ -218,7 +219,7 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
 
     fn_ret = watdfs_release_rw_lock(is_write);
     //// END OF CRITICAL SECTION
-    
+
     //////////
     // CLIENT WRITE
 
