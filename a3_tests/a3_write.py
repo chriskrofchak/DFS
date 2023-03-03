@@ -1,7 +1,7 @@
 import os
 
 user_ = os.environ.get("USER")
-filename_ = "/tmp/" + user_ + "/mount/a3_opn_write.txt"
+filename_ = "/tmp/" + user_ + "/mount/open31.txt"
 fd = os.open(filename_, os.O_RDWR|os.O_CREAT)
 print("Opened", filename_, "successfully with fd", fd)
 
