@@ -199,10 +199,19 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     char buf[statbuf.st_size];
     if (fi->flags & O_WRONLY) fi->flags = (fi->flags & ~O_WRONLY) | O_RDWR; // since we need to read too
 
+    bool is_write = (fi->flags & (O_WRONLY | O_RDWR)) != 0;
+
+    // TODO: decide if you need to spin or not
+    fn_ret = watdfs_get_rw_lock(is_write);
+
+    // this should be atomic
     fn_ret = a2::watdfs_cli_open(userdata, path, fi);
     HANDLE_RET("open failed in cli_transfer", fn_ret) // this errror is normal if ENOFILE
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
     HANDLE_RET("cli_read rpc failed in cli_transfer", fn_ret)
+
+    fn_ret = watdfs_release_rw_lock(is_write);
+
     
     // if we are just bringing it over to read/ not an open call,
     // we don't need to keep the fd.
@@ -210,7 +219,6 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
         fn_ret = a2::watdfs_cli_release(userdata, path, fi); // close our FD / release
         HANDLE_RET("cli_release in transfer failed", fn_ret)
     }
-
     //////////
     // CLIENT WRITE
 
@@ -281,6 +289,9 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // NO OPEN because file should ALREADY BE OPEN if you're WRITING TO IT
     // subject to change...
 
+    // ATOMIC WRITES
+    fn_ret = watdfs_get_rw_lock(true); // needs to write
+
     // write buf on server
     // todo fix fuse_file_info
     fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, fi);
@@ -290,6 +301,9 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     struct timespec times[2] = { statbuf.st_atim, statbuf.st_mtim };
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
     HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
+
+    // can release lock
+    fn_ret = watdfs_release_rw_lock(true);
 
     // close on the server, not the job of flush_file
     // fn_ret = a2::watdfs_cli_release(userdata, path, fi);

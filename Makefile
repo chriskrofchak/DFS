@@ -11,8 +11,8 @@ WATDFS_CLI_FILES= watdfs_client.cpp watdfs_make_args.cpp a2_client.cpp
 WATDFS_CLI_OBJS= watdfs_client.o watdfs_make_args.o a2_client.o
 
 # Add files you want to go into your server here.
-WATDFS_SERVER_FILES = watdfs_server.cpp watdfs_make_args.cpp
-WATDFS_SERVER_OBJS = watdfs_server.o watdfs_make_args.o
+WATDFS_SERVER_FILES = watdfs_server.cpp watdfs_make_args.cpp rw_lock.cpp
+WATDFS_SERVER_OBJS = watdfs_server.o watdfs_make_args.o rw_lock.o
 # E.g. for A3 add rw_lock.c and rw_lock.o to the
 # WATDFS_SERVER_FILES and WATDFS_SERVER_OBJS respectively.
 

@@ -7,6 +7,7 @@
 #include "watdfs_make_args.h"
 #include "rpc.h"
 #include "debug.h"
+#include "rw_lock.h"
 
 INIT_LOG
 
@@ -30,6 +31,8 @@ INIT_LOG
 // Global state server_persist_dir.
 char *server_persist_dir = nullptr;
 std::mutex persist_mut{};
+
+rw_lock_t rw_lock{};
 
 #define PROLOGUE                                   \
     char *short_path = (char *)args[0];            \
@@ -134,9 +137,23 @@ ServerBook filebook{};
 // ATOMIC FILE TRANSFER
 
 int watdfs_rw_acquire(int *argTypes, void **args) {
+    int *lock_mode = (int*)args[0];
+    int *ret = (int*)args[1];
+
+    rw_lock_mode_t mode = (*lock_mode == 0) ? RW_READ_LOCK : RW_WRITE_LOCK; 
+    int fn_ret = rw_lock_lock(&rw_lock, mode);
+    *ret = fn_ret;
+    return 0;
 }
 
 int watdfs_rw_release(int *argTypes, void **args) {
+    int *lock_mode = (int*)args[0];
+    int *ret = (int*)args[1];
+
+    rw_lock_mode_t mode = (*lock_mode == 0) ? RW_READ_LOCK : RW_WRITE_LOCK; 
+    int fn_ret = rw_lock_unlock(&rw_lock, mode);
+    *ret = fn_ret;
+    return 0;
 }
 
 
@@ -317,7 +334,9 @@ int watdfs_read(int *argTypes, void **args) {
     *ret = 0;
 
     DLOG("in watdfs_read: size is %ld and offset is %ld\n", *sz, *offset);
+    filebook.lock();
     int sys_ret = pread(fi->fh, buf, *sz, *offset);
+    filebook.unlock();
     DLOG("in watdfs_read: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
@@ -348,7 +367,10 @@ int watdfs_write(int *argTypes, void **args) {
     int *ret = (int *)args[5];
     *ret = 0;
 
+    filebook.lock();
     int sys_ret = pwrite(fi->fh, buf, *sz, *offset);
+    filebook.unlock();
+    
     DLOG("in watdfs_write: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
@@ -444,6 +466,8 @@ int main(int argc, char *argv[]) {
     }
 
     int ret = 0;
+
+    rw_lock_init(&rw_lock);
     // TODO: If there is an error with `rpcServerInit`, it maybe useful to have
     // debug-printing here, and then you should return.
 
@@ -591,6 +615,8 @@ int main(int argc, char *argv[]) {
 
     // TODO: Hand over control to the RPC library by calling `rpcExecute`.
     int exec_ret = rpcExecute();
+
+    rw_lock_destroy(&rw_lock);
 
     if (exec_ret < 0) {
         DLOG("error with rpcExecute...");
