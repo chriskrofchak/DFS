@@ -420,6 +420,8 @@ int watdfs_cli_open(void *userdata, const char *path,
     struct fuse_file_info ser_fi{};
     ser_fi.flags = fi->flags;
 
+    DLOG("in watdfs_cli_open, fi->flags & O_CREAT: %d", fi->flags & O_CREAT);
+
     if (!watdfs_cli_fresh_file(path)) {
         int fn_ret = transfer_file(userdata, path, true, &ser_fi);
         HANDLE_RET("watdfs_cli_open transfer_file failed", fn_ret)
