@@ -61,10 +61,10 @@ public:
         rw_lock_destroy(rw_lock.get());
     }
     int lock(rw_lock_mode_t mode) {
-        rw_lock_lock(rw_lock.get(), mode);
+        return rw_lock_lock(rw_lock.get(), mode);
     }
     int release(rw_lock_mode_t mode) {
-        rw_lock_unlock(rw_lock.get(), mode);
+        return rw_lock_unlock(rw_lock.get(), mode);
     }
 };
 
