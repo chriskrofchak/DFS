@@ -308,7 +308,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // subject to change...
 
     // ATOMIC WRITES
-    fn_ret = watdfs_get_rw_lock(true); // needs to write
+    fn_ret = watdfs_get_rw_lock(path, true); // needs to write
 
     // write buf on server
     // todo fix fuse_file_info
@@ -321,7 +321,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     HANDLE_RET("utimensat rpc failed in flush_file", fn_ret)
 
     // can release lock
-    fn_ret = watdfs_release_rw_lock(true);
+    fn_ret = watdfs_release_rw_lock(path, true);
 
     // close on the server, not the job of flush_file
     // fn_ret = a2::watdfs_cli_release(userdata, path, fi);
