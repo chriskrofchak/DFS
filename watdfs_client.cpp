@@ -185,7 +185,10 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     // getattr
     struct stat statbuf{};
     int fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-    HANDLE_RET("client stat returned error in transfer_file", fn_ret)
+    if ((fi->flags & O_CREAT) == 0)
+        HANDLE_RET("client stat returned error in transfer_file", fn_ret)
+
+    // else, we'll create the file
 
     // SO, file exists on server, read from it and then 
     // update client file
