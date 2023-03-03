@@ -27,12 +27,13 @@ INIT_LOG
 #include <unordered_map>
 // #include <unordered_set>
 #include <utility>
+#include <memory>
 
 // Global state server_persist_dir.
 char *server_persist_dir = nullptr;
 std::mutex persist_mut{};
 
-rw_lock_t rw_lock{};
+// rw_lock_t rw_lock{};
 
 #define PROLOGUE                                   \
     char *short_path = (char *)args[0];            \
@@ -48,18 +49,34 @@ rw_lock_t rw_lock{};
 #define UPDATE_RET if (sys_ret < 0) *ret = -errno
 
 
-
-
-
+// C++ Wrapper for rw_lock_t
+// so that destructor is called in a C++ way
+class RWLock {
+    std::unique_ptr<rw_lock_t> rw_lock;
+public:
+    RWLock() : rw_lock(std::make_unique<rw_lock_t>()) {
+        rw_lock_init(rw_lock.get());
+    }
+    ~RWLock() {
+        rw_lock_destroy(rw_lock.get());
+    }
+    int lock(rw_lock_mode_t mode) {
+        rw_lock_lock(rw_lock.get(), mode);
+    }
+    int release(rw_lock_mode_t mode) {
+        rw_lock_unlock(rw_lock.get(), mode);
+    }
+};
 
 // thread safe file tracker using mutex m
 class ServerBook {
     std::mutex m;
     std::unordered_multimap<std::string, int> open_files;
     std::unordered_map<std::string, int>  write_fd;
+    std::unordered_map<std::string, std::unique_ptr<RWLock> > file_locks;
 public:
-    ServerBook() {}
-    // ~ServerBook() {}
+    ServerBook() : m(), open_files(), write_fd(), file_locks() {}
+    ~ServerBook() {} // default. and unique ptr will destroy locks for us
 
     // so you can lock and unlock it
     void lock() { m.lock(); }
@@ -127,6 +144,37 @@ public:
     bool is_open_for_write(const char *path) {
         return is_open_for_write(std::string(path));
     }
+
+    // LOCKING FUNCTIONALITY FOR TRANSFERS
+    int lock_file(std::string path, rw_lock_mode_t mode) {
+        // just need to lock it to atomically add a RWLock
+        m.lock();
+        if (!file_locks.count(path)) {
+            file_locks.insert(
+                std::pair<std::string, std::unique_ptr<RWLock>>(
+                    path, 
+                    std::make_unique<RWLock>()
+                )
+            );
+        }
+        m.unlock();
+
+        // NOW can get transfer read write lock
+        return file_locks.at(path)->lock(mode);
+    }
+
+    int unlock_file(std::string path, rw_lock_mode_t mode) {
+        return file_locks.at(path)->release(mode);
+    }
+
+    /// overloading for const char
+    int lock_file(const char *path, rw_lock_mode_t mode) {
+        return lock_file(std::string(path), mode);
+    }
+
+    int unlock_file(const char *path, rw_lock_mode_t mode) {
+        return unlock_file(std::string(path), mode);
+    }
 };
 
 // used to keep state on server side
@@ -137,21 +185,23 @@ ServerBook filebook{};
 // ATOMIC FILE TRANSFER
 
 int watdfs_rw_acquire(int *argTypes, void **args) {
-    int *lock_mode = (int*)args[0];
-    int *ret = (int*)args[1];
+    const char *path = (const char*)args[0];
+    int *lock_mode = (int*)args[1];
+    int *ret = (int*)args[2];
 
     rw_lock_mode_t mode = (*lock_mode == 0) ? RW_READ_LOCK : RW_WRITE_LOCK; 
-    int fn_ret = rw_lock_lock(&rw_lock, mode);
+    int fn_ret = filebook.lock_file(path, mode);
     *ret = fn_ret;
     return 0;
 }
 
 int watdfs_rw_release(int *argTypes, void **args) {
-    int *lock_mode = (int*)args[0];
-    int *ret = (int*)args[1];
+    const char *path = (const char*)args[0];
+    int *lock_mode = (int*)args[1];
+    int *ret = (int*)args[2];
 
     rw_lock_mode_t mode = (*lock_mode == 0) ? RW_READ_LOCK : RW_WRITE_LOCK; 
-    int fn_ret = rw_lock_unlock(&rw_lock, mode);
+    int fn_ret = filebook.unlock_file(path, mode);
     *ret = fn_ret;
     return 0;
 }
@@ -473,7 +523,7 @@ int main(int argc, char *argv[]) {
 
     int ret = 0;
 
-    rw_lock_init(&rw_lock);
+    // rw_lock_init(&rw_lock);
     // TODO: If there is an error with `rpcServerInit`, it maybe useful to have
     // debug-printing here, and then you should return.
 
@@ -622,7 +672,7 @@ int main(int argc, char *argv[]) {
     // TODO: Hand over control to the RPC library by calling `rpcExecute`.
     int exec_ret = rpcExecute();
 
-    rw_lock_destroy(&rw_lock);
+    // rw_lock_destroy(&rw_lock);
 
     if (exec_ret < 0) {
         DLOG("error with rpcExecute...");
