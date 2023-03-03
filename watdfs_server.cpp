@@ -308,9 +308,15 @@ int watdfs_release(int *argTypes, void **args) {
     // is atomic
     filebook.lock();
     // actual syscall
-    int sys_ret = close(fi->fh);
     filebook.close_file(short_path, fi->fh, fi->flags);
-    filebook.unlock();
+
+    int sys_ret = 0;
+
+    // if we closed all open files, then actually close the file
+    if (!filebook.is_file_open(short_path))
+        sys_ret = close(fi->fh);
+
+    filebook.unlock(); // out of critical section
 
     UPDATE_RET;
 
@@ -334,9 +340,9 @@ int watdfs_read(int *argTypes, void **args) {
     *ret = 0;
 
     DLOG("in watdfs_read: size is %ld and offset is %ld\n", *sz, *offset);
-    filebook.lock();
+    // filebook.lock();
     int sys_ret = pread(fi->fh, buf, *sz, *offset);
-    filebook.unlock();
+    // filebook.unlock();
     DLOG("in watdfs_read: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
@@ -367,10 +373,10 @@ int watdfs_write(int *argTypes, void **args) {
     int *ret = (int *)args[5];
     *ret = 0;
 
-    filebook.lock();
+    // filebook.lock();
     int sys_ret = pwrite(fi->fh, buf, *sz, *offset);
-    filebook.unlock();
-    
+    // filebook.unlock();
+
     DLOG("in watdfs_write: sys_ret is %d and errno is %d\n", sys_ret, errno);
 
     // HANDLE ERRORS
