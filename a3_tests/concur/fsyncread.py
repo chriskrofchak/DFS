@@ -6,7 +6,7 @@ make_filename = lambda: str(uuid.uuid4())[:8] + ".txt"
 
 user_ = os.environ.get("USER")
 mountpath_ = "/tmp/" + user_ + "/mount/"
-filename_ = sys.argv[1] # pass filename to read
+filename_ = mountpath_ + sys.argv[1] # pass filename to read
 
 print("This trial's filename is:", filename_)
 print("Beginning test...\n===")
