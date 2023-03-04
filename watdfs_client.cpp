@@ -131,10 +131,19 @@ bool freshness_check(void *userdata, const char *path) {
     // else, need to check T_client and T_server
     struct stat cli_statbuf, ser_statbuf;
     stat(path, &cli_statbuf);
+    // assume file works.
     a2::watdfs_cli_getattr(userdata, path, &ser_statbuf);
     auto T_client = cli_statbuf.st_mtim; 
     auto T_server = ser_statbuf.st_mtim;
     return (T_client == T_server);
+}
+
+void update_freshness(void *userdata, const char *path) {
+    // when writing / transferring
+    // take for granted that T_client and T_server are updatd,
+    // so just update
+    OpenBook * ob = static_cast<OpenBook *>(userdata);
+    ob->set_validate(time(NULL)); // set to Now
 }
 
 bool watdfs_cli_fresh_file(void *userdata, const char *path) {
@@ -614,7 +623,16 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
 int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
     // TODO
-    int fn_ret = watdfs_server_flush_file(userdata, path, fi);
+
+    OpenBook *ob = static_cast<OpenBook *>(userdata);
+
+    fd_pair fdp = ob->get_fd_pair(std::string(path));
+    struct fuse_file_info ser_fi{};
+    // if no RDWR or WR_ONLY then cannot flush, 
+    // should properly return permission error
+    ser_fi.flags = fi->flags; 
+    ser_fi.fh = fdp.ser_fd; // need the proper server fd
+    int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
 
     return 0;
