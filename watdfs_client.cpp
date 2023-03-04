@@ -435,7 +435,8 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     std::string full_path = absolut_path(path);
     int fn_ret;
 
-    if (!watdfs_cli_fresh_file(userdata, full_path.c_str())) {
+    // always bring file over... THEN cache
+    if (true) {
         // get file from server
         struct fuse_file_info fi{};
         fi.flags = O_RDONLY;
@@ -485,7 +486,8 @@ int watdfs_cli_open(void *userdata, const char *path,
     // open file locally and return file descriptor
     std::string full_path = absolut_path(path);
 
-    if (!watdfs_cli_fresh_file(userdata, full_path.c_str())) {
+    // add cache later
+    if (true) {
         int fn_ret = transfer_file(userdata, path, true, &ser_fi);
         HANDLE_RET("watdfs_cli_open transfer_file failed", fn_ret)
     } else {
