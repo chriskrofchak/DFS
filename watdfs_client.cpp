@@ -473,6 +473,7 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
 int watdfs_cli_open(void *userdata, const char *path,
                     struct fuse_file_info *fi) {
     // bring the file over to client if needed
+    if (is_file_open(userdata, path)) return -EMFILE;
 
     // we need to make a struct fuse_file_info 
     // to send to server and keep track of cli_fi and ser_fi
