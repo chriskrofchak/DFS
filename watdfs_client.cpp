@@ -588,7 +588,9 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // grab file from server 
     // idk what to do with fi yet
 
-    int fn_ret = truncate(path, newsize);
+    std::string full_path = absolut_path(path);
+
+    int fn_ret = truncate(full_path.c_str(), newsize);
     HANDLE_SYS("couldn't truncate local file in cli_truncate", fn_ret)
 
     // TODO add freshness check push to server if timed out...
