@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "rpc.h"
 #include "a2_client.h"
+#include <time.h>
 
 // SYSCALLS
 #include <fcntl.h>           /* Definition of AT_* constants */
@@ -58,12 +59,14 @@ struct fd_pair {
 class OpenBook {
     // map for filename, client file descriptor fd, and client flags.
     std::string cache_path_;
-    time_t cache_int_;
+    time_t t; // this is little t
+    time_t Tc;
     std::unordered_map<std::string, fd_pair> open_files;
 public:
     OpenBook(const char* path, time_t cache_int) : 
         cache_path_(std::string(path)),
-        cache_int_(cache_int),
+        t(cache_int),
+        Tc(0),
         open_files() {}
     ~OpenBook() {}
 
@@ -72,7 +75,9 @@ public:
     int OB_close(std::string filename);
     fd_pair get_fd_pair(std::string filename) { return open_files.at(filename); }
     std::string get_cache() { return cache_path_; }
-    time_t get_interval() { return cache_int_; }
+    time_t get_interval() { return t; }
+    time_t get_last_validated() { return Tc; }
+    void set_validate(time_t new_Tc) { Tc = new_Tc; };
     bool is_open(const char *path) { return open_files.count(std::string(path)); }
 };
 
@@ -108,9 +113,39 @@ bool watdfs_cli_file_exists(const char *path) {
     return true; // file exists
 }
 
-bool watdfs_cli_fresh_file(const char *path) {
+bool operator==(const timespec &l, const timespec &r) {
+    return (l.tv_sec == r.tv_sec) && (l.tv_nsec == r.tv_nsec);
+}
+
+// freshness requires that both files exist
+// check other conditions for short circuiting 
+bool freshness_check(void *userdata, const char *path) {
+    OpenBook * ob = static_cast<OpenBook *>(userdata);
+    // int T, tc, T_server, T_client;
+    // current time T
+    time_t T  = time(NULL);
+    time_t tc = ob->get_last_validated();
+    time_t t  = ob->get_interval();
+    if (T - tc < t) return true;
+    
+    // else, need to check T_client and T_server
+    struct stat cli_statbuf, ser_statbuf;
+    stat(path, &cli_statbuf);
+    a2::watdfs_cli_getattr(userdata, path, &ser_statbuf);
+    auto T_client = cli_statbuf.st_mtim; 
+    auto T_server = ser_statbuf.st_mtim;
+    return (T_client == T_server);
+}
+
+bool watdfs_cli_fresh_file(void *userdata, const char *path) {
     // (for testing before freshness checks)
     // TODO CHANGE BACK
+    /*
+    logic: 
+    if (! file exists ) return false; // not fresh if DNE
+    // else, file exists, check if fresh
+    return freshness_check(userdata, path); 
+    */
     return watdfs_cli_file_exists(path); // for now
 }
 
@@ -212,6 +247,8 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     RLS_IF_ERR(fn_ret, is_write);
     HANDLE_RET("open failed in cli_transfer", fn_ret) // this error is normal if ENOFILE, ENOENT
     
+    DLOG("watdfs_cli_read in transfer_file gives fh: %ld", fi->fh);
+
     // this way, if there was no file but O_CREAT was passed, we keep going
     fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
     RLS_IF_ERR(fn_ret, is_write);
@@ -223,7 +260,6 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
     fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, fi);
     RLS_IF_ERR(fn_ret, is_write);
     HANDLE_RET("cli_read rpc failed in cli_transfer", fn_ret)
-
 
     
     // if we are just bringing it over to read/ not an open call,
@@ -304,8 +340,8 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     ssize_t b_read = read(fd, (void *)buf, statbuf.st_size);
     HANDLE_SYS("client local read failed in flush_file", b_read)
 
-    // NO OPEN because file should ALREADY BE OPEN if you're WRITING TO IT
-    // subject to change...
+    // this should be after a freshness check (if fresh, return 0)
+    // else : lock and write
 
     // ATOMIC WRITES
     fn_ret = watdfs_get_rw_lock(path, true); // needs to write
@@ -399,7 +435,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     std::string full_path = absolut_path(path);
     int fn_ret;
 
-    if (!watdfs_cli_fresh_file(full_path.c_str())) {
+    if (!watdfs_cli_fresh_file(userdata, full_path.c_str())) {
         // get file from server
         struct fuse_file_info fi{};
         fi.flags = O_RDONLY;
@@ -418,7 +454,9 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
     struct stat statbuf{};
     // file exists already, locally
     std::string full_path = absolut_path(path);
-    if (watdfs_cli_fresh_file(full_path.c_str()) || !stat(full_path.c_str(), &statbuf)) return -EEXIST;
+    // stat should return error
+    if (watdfs_cli_fresh_file(userdata, full_path.c_str()) || 
+        stat(full_path.c_str(), &statbuf) == 0) return -EEXIST;
 
     int fn_ret = a2::watdfs_cli_mknod(userdata, path, mode, dev);
     HANDLE_RET("error returned from mknod rpc, maybe file exists", fn_ret)
@@ -446,12 +484,18 @@ int watdfs_cli_open(void *userdata, const char *path,
     // open file locally and return file descriptor
     std::string full_path = absolut_path(path);
 
-    if (!watdfs_cli_fresh_file(full_path.c_str())) {
+    if (!watdfs_cli_fresh_file(userdata, full_path.c_str())) {
         int fn_ret = transfer_file(userdata, path, true, &ser_fi);
         HANDLE_RET("watdfs_cli_open transfer_file failed", fn_ret)
+    } else {
+        // didn't transfer file over, so there is no ser_fi.fh flag
+        // need to open it on server and preserve fd? 
+        int fn_ret = a2::watdfs_cli_open(userdata, path, &ser_fi);
+        HANDLE_RET("couldn't open file (permissions from server)", fn_ret)
+        // DLOG("didn't transfer file, so...");
     }
 
-    DLOG("trasnfer was successful, what's the file descriptor for ser_fi? %ld", ser_fi.fh);
+    DLOG("transfer was successful, what's the file descriptor for ser_fi? %ld", ser_fi.fh);
 
     int local_fd = open(full_path.c_str(), fi->flags);
     HANDLE_SYS("client side open failed", local_fd)
@@ -530,32 +574,49 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     int bytes_written = pwrite(fi->fh, (void *)buf, size, offset);
     HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
 
+    // TODO fsync to server if does not pass freshness check
     return bytes_written;
 }
 
+// this is a write call
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
 
     // grab file from server 
     // idk what to do with fi yet
-    struct fuse_file_info fi{};
 
-    int fn_ret = transfer_file(userdata, path, false, &fi);
-    HANDLE_RET("transferring file failed in cli_truncate", fn_ret)
+    int fn_ret = truncate(path, newsize);
+    HANDLE_SYS("couldn't truncate local file in cli_truncate", fn_ret)
 
-    return fn_ret;
+    // TODO add freshness check push to server if timed out...
+    if (true) {
+        fn_ret = watdfs_get_rw_lock(path, true); 
+        RLS_IF_ERR("error getting rw lock for truncate", true);
+        HANDLE_RET("couldn't get rw_lock for cli_truncate", fn_ret)
+
+        fn_ret = a2::watdfs_cli_truncate(userdata, path, newsize);
+        HANDLE_RET("error updating metadata on server file", fn_ret)
+
+        fn_ret = watdfs_release_rw_lock(path, true);
+        RLS_IF_ERR("error releasing rw lock for truncate", true);
+        HANDLE_RET("coulnd't release rw_lock for cli_truncate", fn_ret)
+    }
+
+    return 0;
 }
 
+// this is a write call, need to make sure file is open for write
 int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
     // TODO
     int fn_ret = watdfs_server_flush_file(userdata, path, fi);
-    HANDLE_RET("cli_fsync flush failed", fn_ret)
+    HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
 
-    return fn_ret;
+    return 0;
 }
 
 // CHANGE METADATA
+// this is a write call, need to open
 int watdfs_cli_utimensat(void *userdata, const char *path,
                          const struct timespec ts[2]) {
     // get file if not on client
@@ -563,19 +624,32 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
     fi.flags = O_WRONLY; // will get changed to O_RDWR in transfer_file
     int fn_ret;
 
+    // set it locally
+    std::string full_path = absolut_path(path);
+
     // if file not fresh
-    if (!watdfs_cli_fresh_file(path)) {
+    if (!watdfs_cli_fresh_file(userdata, full_path.c_str())) {
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("couldn't fetch file for utimensat", fn_ret)
     }
 
-    // set it locally
-    std::string full_path = absolut_path(path);
     fn_ret = utimensat(0, full_path.c_str(), ts, 0);
     HANDLE_SYS("utimensat client failed with errno", fn_ret)
 
-    // TODO flush to server
-    // flush it to server
-    // fn_ret = watdfs_server_flush_file(userdata, path, nullptr);
-    return a2::watdfs_cli_utimensat(userdata, path, ts);
+    // TODO freshness check
+    if (true) {
+        // TODO flush to server
+        fn_ret = watdfs_get_rw_lock(path, true); 
+        RLS_IF_ERR("error getting rw lock for utimensat", true);
+        HANDLE_RET("coulnd't get rw_lock for cli_utimensat", fn_ret)
+
+        fn_ret = a2::watdfs_cli_utimensat(userdata, path, ts);
+        HANDLE_RET("error updating metadata on server file", fn_ret)
+
+        fn_ret = watdfs_release_rw_lock(path, true);
+        RLS_IF_ERR("error releasing rw lock for utimensat", true);
+        HANDLE_RET("coulnd't release rw_lock for cli_utimensat", fn_ret)
+    }
+
+    return 0;
 }
