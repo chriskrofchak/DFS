@@ -15,6 +15,7 @@ fd = os.open(filename_, os.O_RDONLY)
 print("Opened", filename_, "successfully with fd", fd)
 
 res = os.pread(fd, 7, 0) # will be less first time if file is empty!
+print(res)
 
 os.close(fd)
 print("Closed", filename_, "successfully.")
