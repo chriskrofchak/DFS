@@ -7,8 +7,8 @@
 # make zip --- cleans and produces a zip file
 
 # Add files you want to go into your client library here.
-WATDFS_CLI_FILES= watdfs_client.cpp watdfs_make_args.cpp a2_client.cpp
-WATDFS_CLI_OBJS= watdfs_client.o watdfs_make_args.o a2_client.o
+WATDFS_CLI_FILES= watdfs_client.cpp watdfs_make_args.cpp a2_client.cpp openbook.cpp 
+WATDFS_CLI_OBJS= watdfs_client.o watdfs_make_args.o a2_client.o openbook.o
 
 # Add files you want to go into your server here.
 WATDFS_SERVER_FILES = watdfs_server.cpp watdfs_make_args.cpp rw_lock.cpp
