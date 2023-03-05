@@ -28,4 +28,20 @@ extern pthread_mutex_t __nfs_debug_lock__;
     } while (0)
 #endif // NDEBUG
 
+// OTHER DEBUG MACROS
+
+#define HANDLE_RET(msg, ret)                                               \
+  if (ret < 0) {                                                           \
+      DLOG("failed with message:\n    %s\n    and retcode %d", msg, ret);  \
+      return ret;                                                          \
+  }
+
+#define HANDLE_SYS(msg, ret)                                                         \
+  if (ret < 0) {                                                                     \
+      DLOG("syscall failed with message:\n    %s\n    and errcode %d", msg, errno);  \
+      return -errno;                                                                 \
+  }
+
+#define RLS_IF_ERR(fn_ret, is_write) if (fn_ret < 0) watdfs_release_rw_lock(path, is_write)
+
 #endif

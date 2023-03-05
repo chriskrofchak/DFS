@@ -63,4 +63,6 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
 }
 #endif
 
+std::string absolut_path(const char *path);
+
 #endif

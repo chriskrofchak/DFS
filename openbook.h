@@ -1,3 +1,6 @@
+#ifndef OPENBOOK_H
+#define OPENBOOK_H
+
 #include <string>
 #include <unordered_map>
 
@@ -41,3 +44,5 @@ public:
     void set_validate(std::string filename, time_t new_Tc);
     bool is_open(const char *path);
 };
+
+#endif
