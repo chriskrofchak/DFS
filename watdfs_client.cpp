@@ -66,8 +66,8 @@ public:
     OpenBook(const char* path, time_t cache_int) : 
         cache_path_(std::string(path)),
         t(cache_int),
-        Tc(),
-        open_files() {}
+        open_files(),
+        Tc() {}
     ~OpenBook() {}
 
     // open and close adds and removes from OpenBook
@@ -567,13 +567,13 @@ int watdfs_cli_release(void *userdata, const char *path,
     return 0;
 }
 
-void fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
+int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     OpenBook * ob = static_cast<OpenBook*>(userdata);
     int fn_ret, fd;
     DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
     // TODO 
     // transfer file
-    bool reopen = fi->flags & (O_RDWR | O_WRONLY) == 0;
+    bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
@@ -610,13 +610,13 @@ void fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     return;
 }
 
-void fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
+int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     OpenBook * ob = static_cast<OpenBook*>(userdata);
     int fn_ret, fd;
     DLOG("IN FRESHNESS (FRESH_FLUSH) CHECK CLI_WRITE");
     // TODO 
     // transfer file
-    bool reopen = fi->flags & (O_RDWR | O_RDONLY) == 0;
+    bool reopen = (fi->flags & (O_RDWR | O_RDONLY)) == 0;
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
@@ -665,7 +665,10 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     // ASSUMES FILE IS CORRECTLY OPENED ETC AND
     // fd is in fi->fh
     // if not fresh, bring over file
-    if (!freshness_check(userdata, path)) fresh_fetch(userdata, path, fi);
+    if (!freshness_check(userdata, path)) {
+        int fn_ret = fresh_fetch(userdata, path, fi);
+        HANDLE_RET("fresh_fetch in cli_read FAILED", fn_ret)
+    }
 
     // TODO 
     int bytes_read = pread(fi->fh, (void*)buf, size, offset);
@@ -686,8 +689,11 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     int bytes_written = pwrite(fi->fh, (void *)buf, size, offset);
     HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
 
-    if (!freshness_check(userdata, path)) fresh_flush(userdata, path, fi);
-    
+    if (!freshness_check(userdata, path)) {
+        int fn_ret = fresh_flush(userdata, path, fi);
+        HANDLE_RET("fresh_flush FAILED in cli_write", fn_ret)
+    }
+
     // TODO fsync to server if does not pass freshness check
     return bytes_written;
 }
