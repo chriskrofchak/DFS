@@ -12,8 +12,13 @@ print("Beginning test...\n===")
 
 fd = os.open(filename_, os.O_RDWR|os.O_CREAT)
 print("Opened", filename_, "successfully with fd", fd)
-os.close(fd)
-print("Closed", filename_, "successfully.")
+# os.close(fd)
+# print("Closed", filename_, "successfully.")
 
-os.truncate(filename_, 1000) 
+os.truncate(filename_, 15) 
 print("Truncated successfully.")
+
+res = os.pread(fd, 50, 0)
+print(res)
+
+os.close(fd)

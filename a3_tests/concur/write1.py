@@ -20,3 +20,10 @@ time.sleep(3)
 print("Writing file (it should flush to server)")
 res = os.write(fd, bytes("poppy poppy pop poppy poppy love love", 'utf-8'))
 print("Successfully wrote:", res, "bytes.")
+
+while True:
+    print("Stay open")
+    g = input()
+    if g == 'q':
+        break
+
