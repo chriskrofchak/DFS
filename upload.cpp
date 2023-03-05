@@ -204,10 +204,12 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     int fn_ret, fd;
     std::string full_path = absolut_path(path);
 
+    fd = ob->get_local_fd(std::string(path));
+
     // transfer file
     bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
-    if (reopen) {
-        fn_ret = close(fi->fh);
+    if (true) {
+        fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), O_RDWR);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
@@ -229,8 +231,8 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     fn_ret = pwrite(fd, buf, statbuf.st_size, 0);
     HANDLE_SYS("couldnt write fresh file fresh_fetch", fn_ret)
     
-    if (reopen) {
-        fn_ret = close(fi->fh);
+    if (true) {
+        fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
