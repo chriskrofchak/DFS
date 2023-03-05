@@ -191,6 +191,12 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     return 0;
 }
 
+
+
+///////
+// NEWER FETCH AND FLUSH
+// with clopens
+
 int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     // TODO 
     DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
@@ -259,7 +265,7 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     HANDLE_RET("fresh_flush stat failed in cli_write", fn_ret)
     char buf[statbuf.st_size];
     
-    fn_ret = pread(fi->fh, buf, statbuf.st_size, 0);
+    fn_ret = pread(fd, buf, statbuf.st_size, 0);
     HANDLE_SYS("couldnt read fresh file fresh_flush", fn_ret)
 
     fd_pair fdp = ob->get_fd_pair(std::string(path));
@@ -278,8 +284,8 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
-        ob->set_cli_fd(std::string(path), fi->fh);
+        // fi->fh = fd;
+        ob->set_cli_fd(std::string(path), fd);
     }
 
     ob->set_validate(std::string(path), time(NULL));
