@@ -325,6 +325,8 @@ int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse
 
 // ASSUMES THAT THE FILE IS IN THE CORRECT PATH
 int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_info *fi) {
+    DLOG("IN SERVER_FLUSH_FILE");
+
     // get file locally
     std::string full_path = absolut_path(path);
 
@@ -347,8 +349,9 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     }
     char buf[statbuf.st_size];
 
-    ssize_t b_read = read(fd, (void *)buf, statbuf.st_size);
+    ssize_t b_read = pread(fd, (void *)buf, statbuf.st_size, 0);
     HANDLE_SYS("client local read failed in flush_file", b_read)
+    DLOG("read into buf to flush to server: %s", buf);
 
     // this should be after a freshness check (if fresh, return 0)
     // else : lock and write
@@ -359,7 +362,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // write buf on server
     // todo fix fuse_file_info
     DLOG("getting ESPIPE, whats fi->fh?: %ld", fi->fh);
-    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, fi);
+    fn_ret = a2::watdfs_cli_write(userdata, path, (const char *)buf, statbuf.st_size, 0, fi);
 
     RLS_IF_ERR(fn_ret, true);
     HANDLE_RET("write rpc failed in flush_file", fn_ret)
@@ -629,19 +632,17 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
 // this is a write call, need to make sure file is open for write
 int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
-    // TODO
-
+    // Get server fd
     OpenBook *ob = static_cast<OpenBook *>(userdata);
-
     fd_pair fdp = ob->get_fd_pair(std::string(path));
+
+    // make server file info
     struct fuse_file_info ser_fi{};
-    // if no RDWR or WR_ONLY then cannot flush, 
-    // should properly return permission error
-    ser_fi.flags = fi->flags; 
-    ser_fi.fh = fdp.ser_fd; // need the proper server fd
+    ser_fi.fh    = fdp.ser_fd;
+    ser_fi.flags = fdp.ser_flags;
+    
     int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
-
     return 0;
 }
 

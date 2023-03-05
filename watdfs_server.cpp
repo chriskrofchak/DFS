@@ -337,6 +337,7 @@ int watdfs_open(int *argTypes, void **args) {
         }
         filebook.unlock();
         // else, fill in file descriptor to fi
+        DLOG("SERVER OPENING FILE: %s, with FD: %d", short_path, fd);
         fi->fh = fd;
     }
 
