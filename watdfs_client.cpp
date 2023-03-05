@@ -354,13 +354,13 @@ int watdfs_cli_fsync(void *userdata, const char *path,
          ob->get_server_fd(std::string(path)));
 
     // make server file info
-    struct fuse_file_info ser_fi{};
-    ser_fi.fh    = fdp.ser_fd;
-    ser_fi.flags = fdp.ser_flags;
+    // struct fuse_file_info ser_fi{};
+    // ser_fi.fh    = fdp.ser_fd;
+    // ser_fi.flags = fdp.ser_flags;
 
-    DLOG("ser_fi.fh is: %ld", ser_fi.fh);
+    // DLOG("ser_fi.fh is: %ld", ser_fi.fh);
     
-    int fn_ret = fresh_flush(userdata, path, &ser_fi);
+    int fn_ret = fresh_flush(userdata, path, fi);
     // int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
     return 0;

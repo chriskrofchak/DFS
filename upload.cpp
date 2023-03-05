@@ -249,11 +249,12 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     OpenBook * ob = static_cast<OpenBook*>(userdata);
     std::string full_path = absolut_path(path);
     int fn_ret, fd;
+    fd = ob->get_local_fd(std::string(path));
 
     // transfer file
-    bool reopen = (fi->flags & (O_RDWR | O_RDONLY)) == 0;
+    bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
     if (reopen) {
-        fn_ret = close(fi->fh);
+        fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), O_RDWR);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
