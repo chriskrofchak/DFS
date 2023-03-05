@@ -250,7 +250,8 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     std::string full_path = absolut_path(path);
     int fn_ret, fd;
     fd = ob->get_local_fd(std::string(path));
-
+    DLOG("FRESH_FLUSH GRABBING FD: %d", fd);
+    
     // transfer file
     bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
     if (reopen) {

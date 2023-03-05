@@ -296,7 +296,6 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
 int watdfs_cli_write(void *userdata, const char *path, const char *buf,
                      size_t size, off_t offset, struct fuse_file_info *fi) {
     // Write size amount of data at offset of file from buf.
-
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
 
@@ -308,6 +307,8 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
         int fn_ret = fresh_flush(userdata, path, fi);
         HANDLE_RET("fresh_flush FAILED in cli_write", fn_ret)
     }
+
+    DLOG("WRITE SUCCEEDED WITH FD: %ld", fi->fh);
 
     // TODO fsync to server if does not pass freshness check
     return bytes_written;
