@@ -62,6 +62,8 @@ class OpenBook {
     time_t t; // this is little t
     std::unordered_map<std::string, fd_pair> open_files;
     std::unordered_map<std::string, time_t> Tc;
+    std::unordered_map<int, int> local_fd;
+    std::unordered_map<int, int> server_fd;
 public:
     OpenBook(const char* path, time_t cache_int) : 
         cache_path_(std::string(path)),
@@ -74,7 +76,9 @@ public:
     int OB_open(std::string filename, int cli_fd, uint64_t cli_flags, int ser_fd, uint64_t ser_flags);
     int OB_close(std::string filename);
     fd_pair get_fd_pair(std::string filename) { return open_files.at(filename); }
-    void set_cli_fd(std::string filename, int fd) { open_files.at(filename).cli_fd = fd; }
+    int get_local_fd(std::string filename) { return local_fd.at(get_fd_pair(filename).cli_fd); }
+    int get_server_fd(std::string filename) { return server_fd.at(get_fd_pair(filename).cli_fd); }
+    void set_cli_fd(std::string filename, int fd) { local_fd.at(get_fd_pair(filename).cli_fd) = fd; }
     std::string get_cache() { return cache_path_; }
     time_t get_interval() { return t; }
     time_t get_last_validated(std::string filename) { return Tc.at(filename); }
@@ -99,11 +103,16 @@ int OpenBook::OB_open(
     // else 
     fd_pair fdp(cli_fd, ser_fd, cli_flags, ser_flags);
     open_files.insert(std::pair<std::string, fd_pair>(filename, fdp));
+    local_fd.insert({ cli_fd, cli_fd });
+    server_fd.insert({ cli_fd, ser_fd});
     return 0;
 }
 
 int OpenBook::OB_close(std::string filename) {
+    int fd = open_files.at(filename).cli_fd;
     open_files.erase(filename);
+    local_fd.erase(fd);
+    server_fd.erase(fd);
     return 0;
 }
 
@@ -351,7 +360,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     OpenBook* ob = static_cast<OpenBook*>(userdata);
     int fd;
     if (ob->is_open(path)) {
-        fd = ob->get_fd_pair(std::string(path)).cli_fd; 
+        fd = ob->get_local_fd(std::string(path));
     } else {
         int fd = open(full_path.c_str(), O_RDONLY);
         HANDLE_SYS("opening file in flush_file failed", fd)
@@ -388,6 +397,98 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // close on the server, not the job of flush_file
     // fn_ret = a2::watdfs_cli_release(userdata, path, fi);
     // HANDLE_RET("close rpc failed in flush_file", fn_ret)
+    return 0;
+}
+
+int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
+    // TODO 
+    DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
+    OpenBook * ob = static_cast<OpenBook*>(userdata);
+    int fn_ret, fd;
+    std::string full_path = absolut_path(path);
+
+    // transfer file
+    bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
+    if (reopen) {
+        fn_ret = close(fi->fh);
+        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
+        fd = open(full_path.c_str(), O_RDWR);
+        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
+        // fi->fh = fd;
+    }
+    
+    struct stat statbuf{};
+    fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
+    HANDLE_RET("fresh a2::getattr failed in cli_read", fn_ret)
+    char buf[statbuf.st_size];
+
+    fd_pair fdp = ob->get_fd_pair(std::string(path));
+    struct fuse_file_info ser_fi{};
+    ser_fi.flags = fi->flags;
+    ser_fi.fh    = ob->get_server_fd(std::string(path));
+    fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
+    HANDLE_RET("fresh_fetch a2::cli_read failed", fn_ret)
+
+    fn_ret = pwrite(fd, buf, statbuf.st_size, 0);
+    HANDLE_SYS("couldnt write fresh file fresh_fetch", fn_ret)
+    
+    if (reopen) {
+        fn_ret = close(fi->fh);
+        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
+        fd = open(full_path.c_str(), fi->flags);
+        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
+        fi->fh = fd;
+        ob->set_cli_fd(std::string(path), fd);
+    }
+
+    ob->set_validate(std::string(path), time(NULL));
+    return 0;
+}
+
+int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
+    // TODO 
+    DLOG("IN FRESHNESS (FRESH_FLUSH) CHECK CLI_WRITE");
+
+    OpenBook * ob = static_cast<OpenBook*>(userdata);
+    std::string full_path = absolut_path(path);
+    int fn_ret, fd;
+
+    // transfer file
+    bool reopen = (fi->flags & (O_RDWR | O_RDONLY)) == 0;
+    if (reopen) {
+        fn_ret = close(fi->fh);
+        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
+        fd = open(full_path.c_str(), O_RDWR);
+        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
+        // fi->fh = fd;
+    }
+    
+    struct stat statbuf{};
+    fn_ret = stat(full_path.c_str(), &statbuf);
+    HANDLE_RET("fresh_flush stat failed in cli_write", fn_ret)
+    char buf[statbuf.st_size];
+    
+    fn_ret = pread(fi->fh, buf, statbuf.st_size, 0);
+    HANDLE_SYS("couldnt read fresh file fresh_flush", fn_ret)
+
+    fd_pair fdp = ob->get_fd_pair(std::string(path));
+    struct fuse_file_info ser_fi{};
+    ser_fi.flags = fi->flags;
+    ser_fi.fh    = fdp.ser_fd;
+    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
+    HANDLE_RET("fresh_flush couldnt write", fn_ret)
+
+    
+    if (reopen) {
+        fn_ret = close(fi->fh);
+        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
+        fd = open(full_path.c_str(), fi->flags);
+        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
+        fi->fh = fd;
+        ob->set_cli_fd(std::string(path), fi->fh);
+    }
+
+    ob->set_validate(std::string(path), time(NULL));
     return 0;
 }
 
@@ -471,6 +572,18 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
         // by now, it means the file is on client or we've returned with an error,
+    } else if (!freshness_check(userdata, path)) {
+        // else file is open
+        OpenBook * ob = static_cast<OpenBook *>(userdata);
+        int fd = ob->get_local_fd(std::string(path));
+        uint64_t local_flags = ob->get_fd_pair(std::string(path)).cli_flags;
+        close(fd); // close file
+        struct fuse_file_info fi{};
+        fi.flags = O_RDONLY;
+        fn_ret = transfer_file(userdata, path, false, &fi);
+        HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
+        fd = open(full_path.c_str(), (int)local_flags);
+        ob->set_cli_fd(std::string(path), fd);
     }
 
     // else, file is fresh and on client. get attr and return it
@@ -551,7 +664,6 @@ int watdfs_cli_release(void *userdata, const char *path,
         HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
 
-
     // close client  
     fn_ret = close(fi->fh);
     HANDLE_SYS("close client failed in cli_release", fn_ret)
@@ -564,98 +676,6 @@ int watdfs_cli_release(void *userdata, const char *path,
     CACHE_MUT.lock();
     ob->OB_close(std::string(path));
     CACHE_MUT.unlock();
-    return 0;
-}
-
-int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
-    // TODO 
-    DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
-    OpenBook * ob = static_cast<OpenBook*>(userdata);
-    int fn_ret, fd;
-    std::string full_path = absolut_path(path);
-
-    // transfer file
-    bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
-    if (reopen) {
-        fn_ret = close(fi->fh);
-        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(full_path.c_str(), O_RDWR);
-        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
-    }
-    
-    struct stat statbuf{};
-    fn_ret = a2::watdfs_cli_getattr(userdata, path, &statbuf);
-    HANDLE_RET("fresh a2::getattr failed in cli_read", fn_ret)
-    char buf[statbuf.st_size];
-
-    fd_pair fdp = ob->get_fd_pair(std::string(path));
-    struct fuse_file_info ser_fi{};
-    ser_fi.flags = fi->flags;
-    ser_fi.fh    = fdp.ser_fd;
-    fn_ret = a2::watdfs_cli_read(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
-    HANDLE_RET("fresh_fetch a2::cli_read failed", fn_ret)
-
-    fn_ret = pwrite(fd, buf, statbuf.st_size, 0);
-    HANDLE_SYS("couldnt write fresh file fresh_fetch", fn_ret)
-    
-    if (reopen) {
-        fn_ret = close(fi->fh);
-        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(full_path.c_str(), fi->flags);
-        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
-        ob->set_cli_fd(std::string(path), fd);
-    }
-
-    ob->set_validate(std::string(path), time(NULL));
-    return 0;
-}
-
-int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
-    // TODO 
-    DLOG("IN FRESHNESS (FRESH_FLUSH) CHECK CLI_WRITE");
-
-    OpenBook * ob = static_cast<OpenBook*>(userdata);
-    std::string full_path = absolut_path(path);
-    int fn_ret, fd;
-
-    // transfer file
-    bool reopen = (fi->flags & (O_RDWR | O_RDONLY)) == 0;
-    if (reopen) {
-        fn_ret = close(fi->fh);
-        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(full_path.c_str(), O_RDWR);
-        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
-    }
-    
-    struct stat statbuf{};
-    fn_ret = stat(full_path.c_str(), &statbuf);
-    HANDLE_RET("fresh_flush stat failed in cli_write", fn_ret)
-    char buf[statbuf.st_size];
-    
-    fn_ret = pread(fi->fh, buf, statbuf.st_size, 0);
-    HANDLE_SYS("couldnt read fresh file fresh_flush", fn_ret)
-
-    fd_pair fdp = ob->get_fd_pair(std::string(path));
-    struct fuse_file_info ser_fi{};
-    ser_fi.flags = fi->flags;
-    ser_fi.fh    = fdp.ser_fd;
-    fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
-    HANDLE_RET("fresh_flush couldnt write", fn_ret)
-
-    
-    if (reopen) {
-        fn_ret = close(fi->fh);
-        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(full_path.c_str(), fi->flags);
-        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
-        ob->set_cli_fd(std::string(path), fi->fh);
-    }
-
-    ob->set_validate(std::string(path), time(NULL));
     return 0;
 }
 
