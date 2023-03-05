@@ -359,13 +359,16 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     OpenBook* ob = static_cast<OpenBook*>(userdata);
     int fd;
     if (ob->is_open(path)) {
+        DLOG("FILE IS OPEN.");
         fd = ob->get_local_fd(std::string(path));
     } else {
+        DLOG("FILE NOT OPEN, OPENING...");
         int fd = open(full_path.c_str(), O_RDONLY);
         HANDLE_SYS("opening file in flush_file failed", fd)
     }
     char buf[statbuf.st_size];
 
+    DLOG("fd being used to pread in flush_file is: %ld", fd);
     ssize_t b_read = pread(fd, (void *)buf, statbuf.st_size, 0);
     HANDLE_SYS("client local read failed in flush_file", b_read)
     DLOG("read into buf to flush to server: %s", buf);
@@ -760,7 +763,7 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     OpenBook *ob = static_cast<OpenBook *>(userdata);
     fd_pair fdp = ob->get_fd_pair(std::string(path));
 
-    DLOG("in fsync, fi->fh is: %d, and saved ser_fi is: %d", 
+    DLOG("in fsync, fi->fh is: %ld, and saved ser_fi is: %ld", 
          fi->fh, 
          ob->get_server_fd(std::string(path)));
 
@@ -768,6 +771,8 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     struct fuse_file_info ser_fi{};
     ser_fi.fh    = fdp.ser_fd;
     ser_fi.flags = fdp.ser_flags;
+
+    DLOG("ser_fi.fh is: %ld", ser_fi.fh);
     
     int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
