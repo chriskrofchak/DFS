@@ -11,7 +11,7 @@
 #include "a2_client.h"
 #include <time.h>
 #include "upload.h"
-#include "rw_lock.h"
+#include "rpc_lock.h"
 
 // SYSCALLS
 #include <fcntl.h>           /* Definition of AT_* constants */
