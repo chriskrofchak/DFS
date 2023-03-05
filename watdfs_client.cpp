@@ -563,6 +563,8 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     // or file not fresh, then transfer file
     bool check = is_file_open(userdata, path);
 
+    OpenBook * ob = static_cast<OpenBook *>(userdata);
+
     // always bring file over... THEN cache
     if (!check) {
         // get file from server
@@ -571,9 +573,10 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
         // by now, it means the file is on client or we've returned with an error,
-    } else if (!freshness_check(userdata, path)) {
-        // else file is open
-        OpenBook * ob = static_cast<OpenBook *>(userdata);
+    } else if ((ob->get_fd_pair(std::string(path)).cli_flags & O_RDONLY) 
+                && !freshness_check(userdata, path)) {
+        // else file is open in RDONLY and not fresh.
+        // bring it over
         int fd = ob->get_local_fd(std::string(path));
         uint64_t local_flags = ob->get_fd_pair(std::string(path)).cli_flags;
         close(fd); // close file
