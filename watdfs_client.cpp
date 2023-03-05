@@ -120,6 +120,7 @@ bool operator==(const timespec &l, const timespec &r) {
 // freshness requires that both files exist
 // check other conditions for short circuiting 
 bool freshness_check(void *userdata, const char *path) {
+
     OpenBook * ob = static_cast<OpenBook *>(userdata);
     // int T, tc, T_server, T_client;
     // current time T
@@ -444,8 +445,14 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
     std::string full_path = absolut_path(path);
     int fn_ret;
 
+    // should work whether open or not
+    // if files not open,
+    // if file doesnt exist
+    // or file not fresh, then transfer file
+    bool check = is_file_open(userdata, path);
+
     // always bring file over... THEN cache
-    if (true) {
+    if (!check) {
         // get file from server
         struct fuse_file_info fi{};
         fi.flags = O_RDONLY;
