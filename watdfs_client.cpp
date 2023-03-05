@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 
 // C++ HEADERS
+#include "openbook.h"
 #include <algorithm>
 #include <mutex>
 #include <string>
@@ -45,76 +46,6 @@ std::string absolut_path(const char* path) {
 
 #define RLS_IF_ERR(fn_ret, is_write) if (fn_ret < 0) watdfs_release_rw_lock(path, is_write)
 
-struct fd_pair {
-    int cli_fd, ser_fd;
-    uint64_t cli_flags, ser_flags;
-    fd_pair(int cfd, int sfd, uint64_t cfl, uint64_t sfl) : 
-        cli_fd(cfd),
-        ser_fd(sfd),
-        cli_flags(cfl),
-        ser_flags(sfl)
-    {}
-};
-
-class OpenBook {
-    // map for filename, client file descriptor fd, and client flags.
-    std::string cache_path_;
-    time_t t; // this is little t
-    std::unordered_map<std::string, fd_pair> open_files;
-    std::unordered_map<std::string, time_t> Tc;
-    std::unordered_map<int, int> local_fd;
-    std::unordered_map<int, int> server_fd;
-public:
-    OpenBook(const char* path, time_t cache_int) : 
-        cache_path_(std::string(path)),
-        t(cache_int),
-        open_files(),
-        Tc() {}
-    ~OpenBook() {}
-
-    // open and close adds and removes from OpenBook
-    int OB_open(std::string filename, int cli_fd, uint64_t cli_flags, int ser_fd, uint64_t ser_flags);
-    int OB_close(std::string filename);
-    fd_pair get_fd_pair(std::string filename) { return open_files.at(filename); }
-    int get_local_fd(std::string filename) { return local_fd.at(get_fd_pair(filename).cli_fd); }
-    int get_server_fd(std::string filename) { return server_fd.at(get_fd_pair(filename).cli_fd); }
-    void set_cli_fd(std::string filename, int fd) { local_fd.at(get_fd_pair(filename).cli_fd) = fd; }
-    std::string get_cache() { return cache_path_; }
-    time_t get_interval() { return t; }
-    time_t get_last_validated(std::string filename) { return Tc.at(filename); }
-    void set_validate(std::string filename, time_t new_Tc) { 
-        if (!Tc.count(filename)) {
-            Tc.insert(std::pair<std::string, time_t>(filename, new_Tc));
-        } else {
-            Tc.at(filename) = new_Tc; // update Tc
-        }
-    }
-    bool is_open(const char *path) { return open_files.count(std::string(path)); }
-};
-
-int OpenBook::OB_open(
-    std::string filename, 
-    int cli_fd, 
-    uint64_t cli_flags, 
-    int ser_fd, 
-    uint64_t ser_flags) 
-{
-    if (open_files.count(filename)) return -EMFILE; // BAD
-    // else 
-    fd_pair fdp(cli_fd, ser_fd, cli_flags, ser_flags);
-    open_files.insert(std::pair<std::string, fd_pair>(filename, fdp));
-    local_fd.insert({ cli_fd, cli_fd });
-    server_fd.insert({ cli_fd, ser_fd});
-    return 0;
-}
-
-int OpenBook::OB_close(std::string filename) {
-    int fd = open_files.at(filename).cli_fd;
-    open_files.erase(filename);
-    local_fd.erase(fd);
-    server_fd.erase(fd);
-    return 0;
-}
 
 bool watdfs_cli_file_exists(const char *path) {
     std::string full_path = absolut_path(path);
@@ -439,7 +370,7 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        fi->fh = fd;
+        // fi->fh = fd;
         ob->set_cli_fd(std::string(path), fd);
     }
 
@@ -480,6 +411,9 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
     HANDLE_RET("fresh_flush couldnt write", fn_ret)
 
+    struct timespec times[2] = { statbuf.st_atim, statbuf.st_mtim };
+    fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
+    HANDLE_RET("utimensat rpc failed in fresh_flush", fn_ret)
     
     if (reopen) {
         fn_ret = close(fi->fh);
@@ -588,6 +522,7 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
         fd = open(full_path.c_str(), (int)local_flags);
+        DLOG("open in getattr, fd becomes: %d", fd);
         ob->set_cli_fd(std::string(path), fd);
     }
 
@@ -639,6 +574,7 @@ int watdfs_cli_open(void *userdata, const char *path,
     DLOG("transfer was successful, what's the file descriptor for ser_fi? %ld", ser_fi.fh);
 
     int local_fd = open(full_path.c_str(), fi->flags);
+    DLOG("original local open has fd: %d", local_fd);
     HANDLE_SYS("client side open failed", local_fd)
     fi->fh = local_fd;
 
@@ -763,7 +699,7 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     OpenBook *ob = static_cast<OpenBook *>(userdata);
     fd_pair fdp = ob->get_fd_pair(std::string(path));
 
-    DLOG("in fsync, fi->fh is: %ld, and saved ser_fi is: %ld", 
+    DLOG("in fsync, fi->fh is: %ld, and saved ser_fd is: %d", 
          fi->fh, 
          ob->get_server_fd(std::string(path)));
 
@@ -774,7 +710,8 @@ int watdfs_cli_fsync(void *userdata, const char *path,
 
     DLOG("ser_fi.fh is: %ld", ser_fi.fh);
     
-    int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
+    int fn_ret = fresh_flush(userdata, path, &ser_fi);
+    // int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
     return 0;
 }
