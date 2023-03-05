@@ -251,10 +251,10 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     int fn_ret, fd;
     fd = ob->get_local_fd(std::string(path));
     DLOG("FRESH_FLUSH GRABBING FD: %d", fd);
-    
+
     // transfer file
     bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
-    if (reopen) {
+    if (true) { // i dont want to worry about it...
         fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), O_RDWR);
@@ -281,7 +281,7 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     fn_ret = a2::watdfs_cli_utimensat(userdata, path, times);
     HANDLE_RET("utimensat rpc failed in fresh_flush", fn_ret)
     
-    if (reopen) {
+    if (true) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), fi->flags);
