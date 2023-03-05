@@ -255,8 +255,12 @@ int watdfs_cli_release(void *userdata, const char *path,
         HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
 
+    int fd = ob->get_local_fd(std::string(path));
+    DLOG("FI->FH IN RELEASE: %ld", fi->fh);
+    DLOG("RELEASING WITH NEW FD: %d", fd);
+
     // close client  
-    fn_ret = close(fi->fh);
+    fn_ret = close(fd); // fi->fh may be wrong
     HANDLE_SYS("close client failed in cli_release", fn_ret)
     // close server
     fn_ret = a2::watdfs_cli_release(userdata, path, &ser_fi);
@@ -285,8 +289,12 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
         HANDLE_RET("fresh_fetch in cli_read FAILED", fn_ret)
     }
 
+    // because it could have changed in fresh_fetch
+    OpenBook * ob = static_cast<OpenBook*>(userdata);
+    int fd = ob->get_local_fd(std::string(path));
+
     // TODO 
-    int bytes_read = pread(fi->fh, (void*)buf, size, offset);
+    int bytes_read = pread(fd, (void*)buf, size, offset);
     HANDLE_RET("bytes couldnt properly be read in cli_read", bytes_read);
 
     // else
@@ -298,9 +306,11 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     // Write size amount of data at offset of file from buf.
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
+    OpenBook * ob = static_cast<OpenBook*>(userdata);
+    int fd = ob->get_local_fd(std::string(path));
 
     // TODO
-    int bytes_written = pwrite(fi->fh, (void *)buf, size, offset);
+    int bytes_written = pwrite(fd, (void *)buf, size, offset);
     HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
 
     if (!freshness_check(userdata, path)) {
@@ -308,7 +318,7 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
         HANDLE_RET("fresh_flush FAILED in cli_write", fn_ret)
     }
 
-    DLOG("WRITE SUCCEEDED WITH FD: %ld", fi->fh);
+    DLOG("WRITE SUCCEEDED WITH FD: %d", fd);
 
     // TODO fsync to server if does not pass freshness check
     return bytes_written;
