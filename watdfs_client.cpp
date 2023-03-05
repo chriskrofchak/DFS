@@ -253,7 +253,6 @@ int watdfs_release_rw_lock(const char *path, bool is_write) {
 // not done when file is already open,
 int transfer_file(void *userdata, const char *path, bool persist_fd, struct fuse_file_info *fi) {
     // if files open, stop
-    if (is_file_open(userdata, path)) return -EMFILE;
 
     // getattr
     struct stat statbuf{};
@@ -780,6 +779,7 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
     // set it locally
     std::string full_path = absolut_path(path);
 
+    // fix if file is open before bringing over
     // if file not fresh
     if (!watdfs_cli_fresh_file(userdata, path)) {
         fn_ret = transfer_file(userdata, path, false, &fi);
