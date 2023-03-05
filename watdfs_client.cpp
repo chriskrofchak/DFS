@@ -568,16 +568,18 @@ int watdfs_cli_release(void *userdata, const char *path,
 }
 
 int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
+    // TODO 
+    DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
     OpenBook * ob = static_cast<OpenBook*>(userdata);
     int fn_ret, fd;
-    DLOG("IN FRESHNESS (FRESH_FETCH) CHECK CLI_READ");
-    // TODO 
+    std::string full_path = absolut_path(path);
+
     // transfer file
     bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(path, O_RDWR);
+        fd = open(full_path.c_str(), O_RDWR);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
         fi->fh = fd;
     }
@@ -600,34 +602,36 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(path, fi->flags);
+        fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
         fi->fh = fd;
         ob->set_cli_fd(std::string(path), fd);
     }
 
     ob->set_validate(std::string(path), time(NULL));
-    return;
+    return 0;
 }
 
 int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
-    OpenBook * ob = static_cast<OpenBook*>(userdata);
-    int fn_ret, fd;
-    DLOG("IN FRESHNESS (FRESH_FLUSH) CHECK CLI_WRITE");
     // TODO 
+    DLOG("IN FRESHNESS (FRESH_FLUSH) CHECK CLI_WRITE");
+
+    OpenBook * ob = static_cast<OpenBook*>(userdata);
+    std::string full_path = absolut_path(path);
+    int fn_ret, fd;
+
     // transfer file
     bool reopen = (fi->flags & (O_RDWR | O_RDONLY)) == 0;
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(path, O_RDWR);
+        fd = open(full_path.c_str(), O_RDWR);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
         fi->fh = fd;
     }
     
     struct stat statbuf{};
-    std::string
-    fn_ret = stat(path, &statbuf);
+    fn_ret = stat(full_path.c_str(), &statbuf);
     HANDLE_RET("fresh_flush stat failed in cli_write", fn_ret)
     char buf[statbuf.st_size];
     
@@ -645,14 +649,14 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     if (reopen) {
         fn_ret = close(fi->fh);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(path, fi->flags);
+        fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
         fi->fh = fd;
         ob->set_cli_fd(std::string(path), fi->fh);
     }
 
     ob->set_validate(std::string(path), time(NULL));
-    return;
+    return 0;
 }
 
 // READ AND WRITE DATA
