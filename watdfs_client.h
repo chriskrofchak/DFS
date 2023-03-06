@@ -25,7 +25,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <string>
 
 #ifdef __cplusplus
 // This is for backward compatibility, but all your code *must* be in C++.
@@ -63,7 +62,5 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
 #ifdef __cplusplus
 }
 #endif
-
-std::string absolut_path(const char *path);
 
 #endif

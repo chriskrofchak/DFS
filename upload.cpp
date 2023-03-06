@@ -1,3 +1,5 @@
+#include "upload.h"
+
 // LOCAL HEADERS
 #include "watdfs_client.h"
 #include "watdfs_make_args.h"
