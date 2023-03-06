@@ -383,7 +383,7 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
                          const struct timespec ts[2]) {
     // get file if not on client
     struct fuse_file_info fi{};
-    fi.flags = O_WRONLY; // will get changed to O_RDWR in transfer_file
+    fi.flags = O_RDWR; // will get changed to O_RDWR in transfer_file
     int fn_ret;
 
     // set it locally
