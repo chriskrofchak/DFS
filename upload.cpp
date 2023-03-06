@@ -157,7 +157,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     }
     char buf[statbuf.st_size];
 
-    DLOG("fd being used to pread in flush_file is: %ld", fd);
+    DLOG("fd being used to pread in flush_file is: %d", fd);
     ssize_t b_read = pread(fd, (void *)buf, statbuf.st_size, 0);
     HANDLE_SYS("client local read failed in flush_file", b_read)
     DLOG("read into buf to flush to server: %s", buf);
@@ -207,7 +207,7 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     fd = ob->get_local_fd(std::string(path));
 
     // transfer file
-    bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
+    // bool reopen = (fi->flags & (O_RDWR | O_WRONLY)) == 0;
     if (true) {
         fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
@@ -221,7 +221,7 @@ int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     HANDLE_RET("fresh a2::getattr failed in cli_read", fn_ret)
     char buf[statbuf.st_size];
 
-    fd_pair fdp = ob->get_fd_pair(std::string(path));
+    // fd_pair fdp = ob->get_fd_pair(std::string(path));
     struct fuse_file_info ser_fi{};
     ser_fi.flags = fi->flags;
     ser_fi.fh    = ob->get_server_fd(std::string(path));

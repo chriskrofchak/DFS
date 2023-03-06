@@ -358,7 +358,7 @@ int watdfs_cli_fsync(void *userdata, const char *path,
                      struct fuse_file_info *fi) {
     // Get server fd
     OpenBook *ob = static_cast<OpenBook *>(userdata);
-    fd_pair fdp = ob->get_fd_pair(std::string(path));
+    // fd_pair fdp = ob->get_fd_pair(std::string(path));
 
     DLOG("in fsync, fi->fh is: %ld, and saved ser_fd is: %d", 
          fi->fh, 
