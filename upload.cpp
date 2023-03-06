@@ -255,7 +255,7 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     DLOG("FRESH_FLUSH GRABBING FD: %d", fd);
 
     // transfer file
-    bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
+    // bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
     if (true) { // i dont want to worry about it...
         fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)

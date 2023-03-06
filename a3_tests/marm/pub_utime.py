@@ -29,7 +29,7 @@ print("Stat, to check size:")
 print(os.stat(filename_))
 print("Stat successful")
 
-os.truncate(fd, 6)
+os.truncate(filename_, 6)
 print("Truncate successful")
 
 print("Sleeping for 3s...")
