@@ -285,8 +285,11 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     // fd is in fi->fh
     // if not fresh, bring over file
     if (!freshness_check(userdata, path)) {
-        int fn_ret = fresh_fetch(userdata, path, fi);
+        int fn_ret = watdfs_get_rw_lock(path, false); // read transfer
+        fn_ret = fresh_fetch(userdata, path, fi);
+        RLS_IF_ERR(fn_ret, false);
         HANDLE_RET("fresh_fetch in cli_read FAILED", fn_ret)
+        fn_ret = watdfs_release_rw_lock(path, false);
     }
 
     // because it could have changed in fresh_fetch
@@ -314,8 +317,11 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
 
     if (!freshness_check(userdata, path)) {
-        int fn_ret = fresh_flush(userdata, path, fi);
+        int fn_ret = watdfs_get_rw_lock(path, true);
+        fn_ret = fresh_flush(userdata, path, fi);
+        RLS_IF_ERR(fn_ret, true);
         HANDLE_RET("fresh_flush FAILED in cli_write", fn_ret)
+        fn_ret = watdfs_release_rw_lock(path, true);
     }
 
     DLOG("WRITE SUCCEEDED WITH FD: %d", fd);
@@ -370,8 +376,10 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     // ser_fi.flags = fdp.ser_flags;
 
     // DLOG("ser_fi.fh is: %ld", ser_fi.fh);
-    
-    int fn_ret = fresh_flush(userdata, path, fi);
+    int fn_ret = watdfs_get_rw_lock(path, true); // for write
+    fn_ret = fresh_flush(userdata, path, fi);
+    RLS_IF_ERR(fn_ret, true);
+    fn_ret = watdfs_release_rw_lock(path, true);
     // int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
     return 0;
