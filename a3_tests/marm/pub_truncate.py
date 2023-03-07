@@ -34,7 +34,7 @@ os.close(fd)
 
 fd = os.open(filename_, os.O_RDONLY)
 
-res = os.read(fd)
+res = os.read(fd, 8)
 print("Successfully read:", res)
 
 print("Stat, to check size:")

@@ -12,7 +12,8 @@ print("Beginning test...\n===")
 fd = os.open(filename_, os.O_RDWR)
 print("Opened", filename_, "successfully with fd", fd)
 
-res = os.write(fd, "i like i like i like everything about you") # will be less first time if file is empty!
+res = os.write(fd,bytes("i like i like i like everything about you", "utf-8")) 
+# will be less first time if file is empty!
 print(res, "bytes written successfully to", filename_)
 
 os.close(fd)
