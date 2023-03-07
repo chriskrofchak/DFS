@@ -152,7 +152,12 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     if (ob->is_open(path)) {
         DLOG("FILE IS OPEN.");
         fd = ob->get_local_fd(std::string(path));
-    } else {
+        close(fd);
+        fd = open(full_path.c_str(), O_RDONLY);
+        ob->set_cli_fd(std::string(path), fd);
+    }
+    else {
+        // this will never happen... 
         DLOG("FILE NOT OPEN, OPENING...");
         int fd = open(full_path.c_str(), O_RDONLY);
         HANDLE_SYS("opening file in flush_file failed", fd)
@@ -172,7 +177,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
 
     // write buf on server
     // todo fix fuse_file_info
-    DLOG("getting ESPIPE, whats fi->fh?: %ld", fi->fh);
+    // DLOG("getting ESPIPE, whats fi->fh?: %ld", fi->fh);
     fn_ret = a2::watdfs_cli_write(userdata, path, (const char *)buf, statbuf.st_size, 0, fi);
 
     RLS_IF_ERR(fn_ret, true);
@@ -187,6 +192,8 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
     // can release lock
     fn_ret = watdfs_release_rw_lock(path, true);
 
+    ob->set_validate(std::string(path), time(NULL)); // flushed, so time validate is now
+
     // close on the server, not the job of flush_file
     // fn_ret = a2::watdfs_cli_release(userdata, path, fi);
     // HANDLE_RET("close rpc failed in flush_file", fn_ret)
@@ -198,6 +205,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
 ///////
 // NEWER FETCH AND FLUSH
 // with clopens
+// REQUIRES FILE TO BE OPEN
 
 int fresh_fetch(void *userdata, const char *path, struct fuse_file_info *fi) {
     // TODO 
@@ -258,17 +266,16 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
 
     // transfer file
     // bool reopen = (fi->flags & (O_WRONLY)) != 0; // need to make it RDWR
-    if (true) { // i dont want to worry about it...
-        fn_ret = close(fd);
-        HANDLE_SYS("close failed in fresh_fetch", fn_ret)
-        fd = open(full_path.c_str(), O_RDWR);
-        HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
-        // fi->fh = fd;
-    }
+    
+    fn_ret = close(fd);
+    HANDLE_SYS("close failed in fresh_fetch", fn_ret)
+    fd = open(full_path.c_str(), O_RDWR);
+    HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)
     
     struct stat statbuf{};
     fn_ret = stat(full_path.c_str(), &statbuf);
     HANDLE_RET("fresh_flush stat failed in cli_write", fn_ret)
+
     char buf[statbuf.st_size];
     
     fn_ret = pread(fd, buf, statbuf.st_size, 0);
@@ -278,6 +285,7 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     struct fuse_file_info ser_fi{};
     ser_fi.flags = fi->flags;
     ser_fi.fh    = fdp.ser_fd;
+    
     fn_ret = a2::watdfs_cli_write(userdata, path, buf, statbuf.st_size, 0, &ser_fi);
     HANDLE_RET("fresh_flush couldnt write", fn_ret)
 
@@ -286,7 +294,7 @@ int fresh_flush(void *userdata, const char *path, struct fuse_file_info *fi) {
     HANDLE_RET("utimensat rpc failed in fresh_flush", fn_ret)
     
     if (true) {
-        fn_ret = close(fi->fh);
+        fn_ret = close(fd);
         HANDLE_SYS("close failed in fresh_fetch", fn_ret)
         fd = open(full_path.c_str(), fi->flags);
         HANDLE_SYS("reopen failed in fresh_fetch", fn_ret)

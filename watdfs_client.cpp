@@ -27,6 +27,8 @@
 
 INIT_LOG
 
+#define MAKE_OB OpenBook *ob = static_cast<OpenBook*>(userdata)
+
 std::string CACHE_PATH{};
 std::mutex CACHE_MUT{};
 
@@ -55,6 +57,7 @@ bool freshness_check(void *userdata, const char *path) {
     auto T_server = ser_statbuf.st_mtim;
 
     // set Tc to current time since its validated now
+    // TODO, remove this.
     if (T_client == T_server) ob->set_validate(std::string(path), time(NULL));
     return (T_client == T_server);
 }
@@ -131,6 +134,10 @@ void watdfs_cli_destroy(void *userdata) {
     delete openbook;
 }
 
+bool is_read_only(int flags) {
+    return ((flags & O_RDWR) == 0) && ((flags & 1) == 0);
+}
+
 // GET FILE ATTRIBUTES
 int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
 
@@ -160,17 +167,21 @@ int watdfs_cli_getattr(void *userdata, const char *path, struct stat *statbuf) {
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
         // by now, it means the file is on client or we've returned with an error,
-    } else if ((ob->get_fd_pair(std::string(path)).cli_flags & O_RDONLY) 
-                && !freshness_check(userdata, path)) {
+    } else if (is_read_only(ob->get_fd_pair(std::string(path)).cli_flags) 
+               && !freshness_check(userdata, path)) {
         // else file is open in RDONLY and not fresh.
         // bring it over
         int fd = ob->get_local_fd(std::string(path));
         uint64_t local_flags = ob->get_fd_pair(std::string(path)).cli_flags;
         close(fd); // close file
+
+        // retransfer it over (will open and write and close it)
         struct fuse_file_info fi{};
         fi.flags = O_RDONLY;
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("cli_getattr failed getting file from server", fn_ret)
+
+        // reopen it and set cli_fd for transparency 
         fd = open(full_path.c_str(), (int)local_flags);
         DLOG("open in getattr, fd becomes: %d", fd);
         ob->set_cli_fd(std::string(path), fd);
@@ -195,6 +206,7 @@ int watdfs_cli_mknod(void *userdata, const char *path, mode_t mode, dev_t dev) {
 
     // now make it locally
     // otherwise assume successfully made file, so now, upload file locally
+    // updates metadata etc
     struct fuse_file_info fi{};
     fi.flags = O_RDONLY;
     fn_ret = transfer_file(userdata, path, false, &fi);
@@ -280,19 +292,21 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     // Read size amount of data at offset of file into buf.
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
+    MAKE_OB;
 
     // ASSUMES FILE IS CORRECTLY OPENED ETC AND
     // fd is in fi->fh
     // if not fresh, bring over file
-    if (!freshness_check(userdata, path)) {
+    if (is_read_only(ob->get_fd_pair(std::string(path)).cli_flags)
+        && !freshness_check(userdata, path)) {
         int fn_ret = watdfs_get_rw_lock(path, false); // read transfer
         fn_ret = fresh_fetch(userdata, path, fi);
         RLS_IF_ERR(fn_ret, false);
-        HANDLE_RET("fresh_fetch in cli_read FAILED", fn_ret)
+        HANDLE_RET("fresh_fettch in cli_read FAILED", fn_ret)
         fn_ret = watdfs_release_rw_lock(path, false);
     }
 
-    // because it could have changed in fresh_fetch
+    // because it could have changed in fressh_fetch
     OpenBook * ob = static_cast<OpenBook*>(userdata);
     int fd = ob->get_local_fd(std::string(path));
 
@@ -320,7 +334,7 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
         int fn_ret = watdfs_get_rw_lock(path, true);
         fn_ret = fresh_flush(userdata, path, fi);
         RLS_IF_ERR(fn_ret, true);
-        HANDLE_RET("fresh_flush FAILED in cli_write", fn_ret)
+        HANDLE_RET("fresh_flussh FAILED in cli_write", fn_ret)
         fn_ret = watdfs_release_rw_lock(path, true);
     }
 
@@ -333,26 +347,50 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
 // this is a write call
 int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     // Change the file size to newsize.
+    // if (!watdfs_cli_file_exists(path)) return -ENOENT; // file DNE
 
     // grab file from server 
     // idk what to do with fi yet
-
+    OpenBook *ob = static_cast<OpenBook *>(userdata);
     std::string full_path = absolut_path(path);
+    int fn_ret;
 
+    if (!watdfs_cli_file_exists(path) || !ob->is_open(path)) {
+        // bring it over... will return error if dne on server 
+        struct fuse_file_info fi{};
+        fi.flags = O_RDWR;
+        fn_ret = transfer_file(userdata, path, false, &fi);
+        HANDLE_RET("couldn't fetch file for truncate", fn_ret)
+    } else if (!freshness_check(userdata, path)
+               && is_read_only(ob->get_fd_pair(std::string(path)).cli_flags))
+    {
+        struct fuse_file_info fi{};
+        fi.flags = O_RDWR;
+        fn_ret = transfer_file(userdata, path, false, &fi);
+        HANDLE_RET("couldn't fetch file for truncate", fn_ret)
+    } else {
+        DLOG("DIDNT TRANSFER FILE IN TRUNCATE");
+    }
+
+    // else file is here and is "fresh" (or open for write)
     int fn_ret = truncate(full_path.c_str(), newsize);
     HANDLE_SYS("couldn't truncate local file in cli_truncate", fn_ret)
 
     // TODO add freshness check push to server if timed out...
-    if (true) {
+
+    if (!freshness_check(userdata, path)) {
         fn_ret = watdfs_get_rw_lock(path, true); 
-        RLS_IF_ERR("error getting rw lock for truncate", true);
+        RLS_IF_ERR(fn_ret, true);
         HANDLE_RET("couldn't get rw_lock for cli_truncate", fn_ret)
 
+        // fn_ret = fresh_flush(userdata, path, &fi);
+        // all you did was change 
         fn_ret = a2::watdfs_cli_truncate(userdata, path, newsize);
+        RLS_IF_ERR(fn_ret, true);
         HANDLE_RET("error updating metadata on server file", fn_ret)
 
         fn_ret = watdfs_release_rw_lock(path, true);
-        RLS_IF_ERR("error releasing rw lock for truncate", true);
+        RLS_IF_ERR(fn_ret, true);
         HANDLE_RET("coulnd't release rw_lock for cli_truncate", fn_ret)
     }
 
@@ -380,7 +418,6 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     fn_ret = fresh_flush(userdata, path, fi);
     RLS_IF_ERR(fn_ret, true);
     fn_ret = watdfs_release_rw_lock(path, true);
-    // int fn_ret = watdfs_server_flush_file(userdata, path, &ser_fi);
     HANDLE_RET("couldn't flush file to server in cli_fsync", fn_ret)
     return 0;
 }
@@ -389,26 +426,40 @@ int watdfs_cli_fsync(void *userdata, const char *path,
 // this is a write call, need to open
 int watdfs_cli_utimensat(void *userdata, const char *path,
                          const struct timespec ts[2]) {
+    // 
+    MAKE_OB;
+
     // get file if not on client
-    struct fuse_file_info fi{};
-    fi.flags = O_RDWR; // will get changed to O_RDWR in transfer_file
+    // will get changed to O_RDWR in transfer_file
     int fn_ret;
 
     // set it locally
     std::string full_path = absolut_path(path);
+    bool fresh_check = false;
 
-    // fix if file is open before bringing over
-    // if file not fresh
-    if (!watdfs_cli_fresh_file(userdata, path)) {
+    if (!watdfs_cli_file_exists(path) || !ob->is_open(path)) {
+        // bring it over... will return error if dne on server 
+        struct fuse_file_info fi{};
+        fi.flags = O_RDWR;
+        fn_ret = transfer_file(userdata, path, false, &fi);
+        HANDLE_RET("couldn't fetch file for truncate", fn_ret)
+    } else if (!freshness_check(userdata, path)
+               && is_read_only(ob->get_fd_pair(std::string(path)).cli_flags)) 
+    {
+        struct fuse_file_info fi{};
+        fi.flags = O_RDWR;
         fn_ret = transfer_file(userdata, path, false, &fi);
         HANDLE_RET("couldn't fetch file for utimensat", fn_ret)
+    } else {
+        DLOG("DIDNT TRANSFER FILE IN UTIMENSAT");
+        // fresh_check = is_read_only(ob->get_fd_pair(std::string(path)).cli_flags);
     }
 
     fn_ret = utimensat(0, full_path.c_str(), ts, 0);
     HANDLE_SYS("utimensat client failed with errno", fn_ret)
 
     // TODO freshness check
-    if (true) {
+    if (!freshness_check(userdata, path)) {
         // TODO flush to server
         fn_ret = watdfs_get_rw_lock(path, true); 
         RLS_IF_ERR("error getting rw lock for utimensat", true);
