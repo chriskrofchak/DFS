@@ -307,7 +307,6 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     }
 
     // because it could have changed in fressh_fetch
-    OpenBook * ob = static_cast<OpenBook*>(userdata);
     int fd = ob->get_local_fd(std::string(path));
 
     // TODO 
@@ -373,7 +372,7 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     }
 
     // else file is here and is "fresh" (or open for write)
-    int fn_ret = truncate(full_path.c_str(), newsize);
+    fn_ret = truncate(full_path.c_str(), newsize);
     HANDLE_SYS("couldn't truncate local file in cli_truncate", fn_ret)
 
     // TODO add freshness check push to server if timed out...
@@ -435,7 +434,6 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
 
     // set it locally
     std::string full_path = absolut_path(path);
-    bool fresh_check = false;
 
     if (!watdfs_cli_file_exists(path) || !ob->is_open(path)) {
         // bring it over... will return error if dne on server 
