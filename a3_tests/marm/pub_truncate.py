@@ -45,12 +45,19 @@ while True:
     if g == 'c':
         break
 
-os.truncate(filename_, 6)
-print("Truncate successful")
+try:
+    os.truncate(filename_, 6)
+    print("Truncate successful")
+except Exception as e:
+    print("(Successfully raised error: )")
+    print(e)
 
 # # this should send back to server...
 # os.utime(fd, (11111222,3333444))
 # print("utime successful")
+
+res = os.pread(fd, 8, 0)
+print("Read the following successfully:", res)
 
 os.close(fd)
 print("Successfully closed file")
