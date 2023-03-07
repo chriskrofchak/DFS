@@ -26,11 +26,16 @@ user_ = os.environ.get("USER")
 mountpath_ = "/tmp/" + user_ + "/mount/"
 filename_ = mountpath_ + make_filename()
 
-fd = os.open(filename_, os.O_RDONLY|os.O_CREAT)
+fd = os.open(filename_, os.O_RDWR|os.O_CREAT)
 print("Opened", filename_, "successfully with fd", fd)
 
-res = os.write(fd, bytes("wxyzwxyz", 'utf-8'))
-print("Successfully wrote:", res, "bytes.")
+os.close(fd)
+# SETUP...
+
+fd = os.open(filename_, os.O_RDONLY)
+
+res = os.read(fd)
+print("Successfully read:", res)
 
 print("Stat, to check size:")
 print(os.stat(filename_))
