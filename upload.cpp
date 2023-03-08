@@ -177,7 +177,7 @@ int watdfs_server_flush_file(void *userdata, const char *path, struct fuse_file_
 
     // write buf on server
     // todo fix fuse_file_info
-    // DLOG("getting ESPIPE, whats fi->fh?: %ld", fi->fh);
+    DLOG("getting ESPIPE, whats fi->fh?: %ld", fi->fh);
     fn_ret = a2::watdfs_cli_write(userdata, path, (const char *)buf, statbuf.st_size, 0, fi);
 
     RLS_IF_ERR(fn_ret, true);
