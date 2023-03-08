@@ -135,7 +135,7 @@ void watdfs_cli_destroy(void *userdata) {
 }
 
 bool is_read_only(int flags) {
-    return ((flags & O_RDWR) == 0) && ((flags & 1) == 0);
+    return ((flags & O_RDWR) == 0) && ((flags & O_WRONLY) == 0);
 }
 
 // GET FILE ATTRIBUTES
@@ -297,12 +297,13 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     // ASSUMES FILE IS CORRECTLY OPENED ETC AND
     // fd is in fi->fh
     // if not fresh, bring over file
-    if (is_read_only(ob->get_fd_pair(std::string(path)).cli_flags)
+    if (is_read_only(fi->flags)
         && !freshness_check(userdata, path)) {
+        DLOG("FETCHING FILE FROM SERVER IN CLI_READ");
         int fn_ret = watdfs_get_rw_lock(path, false); // read transfer
         fn_ret = fresh_fetch(userdata, path, fi);
         RLS_IF_ERR(fn_ret, false);
-        HANDLE_RET("fresh_fettch in cli_read FAILED", fn_ret)
+        HANDLE_RET("fresh_ fetch in cli_read FAILED", fn_ret)
         fn_ret = watdfs_release_rw_lock(path, false);
     }
 
