@@ -46,6 +46,7 @@ bool freshness_check(void *userdata, const char *path) {
     time_t T  = time(NULL);
     time_t tc = ob->get_last_validated(std::string(path));
     time_t t  = ob->get_interval();
+    DLOG("T - tc is and cache interval is: %ld < %ld", T-tc, t);
     if (T - tc < t) return true;
     
     // else, need to check T_client and T_server
@@ -329,16 +330,19 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     // TODO
     int bytes_written = pwrite(fd, (void *)buf, size, offset);
     HANDLE_RET("bytes couldnt write properly in cli_write", bytes_written)
+    DLOG("WRITE SUCCEEDED WITH FD: %d", fd);
 
     if (!freshness_check(userdata, path)) {
+        DLOG("not fresh, flushing back to server...");
         int fn_ret = watdfs_get_rw_lock(path, true);
         fn_ret = fresh_flush(userdata, path, fi);
         RLS_IF_ERR(fn_ret, true);
         HANDLE_RET("fresh_flussh FAILED in cli_write", fn_ret)
         fn_ret = watdfs_release_rw_lock(path, true);
+    } else {
+        DLOG("freshness check returning true?");
     }
 
-    DLOG("WRITE SUCCEEDED WITH FD: %d", fd);
 
     // TODO fsync to server if does not pass freshness check
     return bytes_written;
