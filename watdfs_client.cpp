@@ -269,6 +269,7 @@ int watdfs_cli_release(void *userdata, const char *path,
     }
 
     int fd = ob->get_local_fd((int)fi->fh);
+    HANDLE_RET("bad file descriptor", fd)
     DLOG("FI->FH IN RELEASE: %ld", fi->fh);
     DLOG("RELEASING WITH NEW FD: %d", fd);
 
