@@ -118,8 +118,13 @@ public:
         DLOG("filebook.close_file called on file: %s", path.c_str());
         if (!open_files.count(path)) return; // just so no segfault...
 
-        std::unordered_multimap<std::string, int>::iterator it = open_files.find(path);
-        open_files.erase(it); // erases one element
+        auto range_it = open_files.equal_range(path);
+        for (auto it = range_it.first; it != range_it.second; ++it) {
+            if (it->second == fd) {
+                open_files.erase(it);
+                break;
+            }
+        }
 
         if ((mode & (O_RDWR | O_WRONLY)) && write_fd.count(path)) {
             if (fd == write_fd.at(path)) write_fd.erase(path);
@@ -320,21 +325,8 @@ int watdfs_open(int *argTypes, void **args) {
         // either not open for write, 
         // or we don't want to open for write
         // file could be open or not -- need to figure out what to do
-        int fd;
-        if (filebook.is_file_open(short_path)) {
-            // just give it the fd that's open
-            fd = filebook.get_fd(short_path);
-        } else {
-            DLOG("in server_open, the old fashioned way.");
-            fd = open(full_path, fi->flags);
-        }
-        if (fd < 0) {
-            *ret = -errno;
-        } else {
-            // if there was an error we dont want to open file 
-            // and mess up the count
-            filebook.open_file(short_path, fd, fi->flags);
-        }
+        int fd = open(full_path, fi->flags);
+        filebook.open_file(short_path, fd, fi->flags);
         filebook.unlock();
         // else, fill in file descriptor to fi
         DLOG("SERVER OPENING FILE: %s, with FD: %d", short_path, fd);
@@ -359,18 +351,13 @@ int watdfs_release(int *argTypes, void **args) {
     // is atomic
     filebook.lock();
     // actual syscall
+    // close it in state and actually just close fd.
     filebook.close_file(short_path, fi->fh, fi->flags);
-
     int sys_ret = 0;
-
-    // if we closed all open files, then actually close the file
-    if (!filebook.is_file_open(short_path))
-        sys_ret = close(fi->fh);
-
+    sys_ret = close(fi->fh);
     filebook.unlock(); // out of critical section
 
     UPDATE_RET;
-
     EPILOGUE(ret, "watdfs_release");
     return 0;
 }

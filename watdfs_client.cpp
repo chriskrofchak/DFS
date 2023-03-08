@@ -361,6 +361,9 @@ int watdfs_cli_truncate(void *userdata, const char *path, off_t newsize) {
     std::string full_path = absolut_path(path);
     int fn_ret;
 
+    if (ob->is_open(path) && is_read_only(ob->get_fd_pair(std::string(path)).cli_flags))
+        return -EMFILE;
+
     if (!watdfs_cli_file_exists(path) || !ob->is_open(path)) {
         // bring it over... will return error if dne on server 
         struct fuse_file_info fi{};
@@ -410,6 +413,9 @@ int watdfs_cli_fsync(void *userdata, const char *path,
     OpenBook *ob = static_cast<OpenBook *>(userdata);
     // fd_pair fdp = ob->get_fd_pair(std::string(path));
 
+    if (ob->is_open(path) && is_read_only(ob->get_fd_pair(std::string(path)).cli_flags))
+        return -EMFILE;
+
     DLOG("in fsync, fi->fh is: %ld, and saved ser_fd is: %d", 
          fi->fh, 
          ob->get_server_fd(std::string(path)));
@@ -441,6 +447,9 @@ int watdfs_cli_utimensat(void *userdata, const char *path,
 
     // set it locally
     std::string full_path = absolut_path(path);
+
+    if (ob->is_open(path) && is_read_only(ob->get_fd_pair(std::string(path)).cli_flags))
+        return -EMFILE;
 
     if (!watdfs_cli_file_exists(path) || !ob->is_open(path)) {
         // bring it over... will return error if dne on server 
