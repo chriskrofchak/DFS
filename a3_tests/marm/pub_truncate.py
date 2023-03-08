@@ -29,7 +29,8 @@ filename_ = mountpath_ + make_filename()
 fd = os.open(filename_, os.O_RDWR|os.O_CREAT)
 print("Opened", filename_, "successfully with fd", fd)
 
-fd = os.write(fd, bytes("wxyzwxyz", "utf-8"))
+res = os.write(fd, bytes("wxyzwxyz", "utf-8")) # that should have returned an error if 8 wasn't open...
+print("Successfully wrote 8 bytes")
 
 os.close(fd)
 # SETUP...

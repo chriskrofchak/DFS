@@ -267,7 +267,7 @@ int watdfs_cli_release(void *userdata, const char *path,
         HANDLE_RET("flush_file failed in cli_release", fn_ret)
     }
 
-    int fd = ob->get_local_fd(std::string(path));
+    int fd = ob->get_local_fd((int)fi->fh);
     DLOG("FI->FH IN RELEASE: %ld", fi->fh);
     DLOG("RELEASING WITH NEW FD: %d", fd);
 
@@ -307,7 +307,7 @@ int watdfs_cli_read(void *userdata, const char *path, char *buf, size_t size,
     }
 
     // because it could have changed in fressh_fetch
-    int fd = ob->get_local_fd(std::string(path));
+    int fd = ob->get_local_fd((int)fi->fh);
 
     // TODO 
     int bytes_read = pread(fd, (void*)buf, size, offset);
@@ -323,7 +323,7 @@ int watdfs_cli_write(void *userdata, const char *path, const char *buf,
     // Remember that size may be greater then the maximum array size of the RPC
     // library.
     OpenBook * ob = static_cast<OpenBook*>(userdata);
-    int fd = ob->get_local_fd(std::string(path));
+    int fd = ob->get_local_fd((int)fi->fh); // need it to raise error if not kept track properly
 
     // TODO
     int bytes_written = pwrite(fd, (void *)buf, size, offset);

@@ -5,7 +5,15 @@ fd_pair OpenBook::get_fd_pair(std::string filename) {
 }
 
 int OpenBook::get_local_fd(std::string filename) {
-    return local_fd.at(get_fd_pair(filename).cli_fd); 
+    if (!local_fd.count( open_files.at(filename).cli_fd )) return -EBADF; // bad file descriptor
+    // else
+    return local_fd.at( open_files.at(filename).cli_fd ); 
+}
+
+int OpenBook::get_local_fd(int fd) {
+    if (!local_fd.count(fd)) return -EBADF; // bad file descriptor
+    // else
+    return local_fd.at(fd); 
 }
 
 int OpenBook::get_server_fd(std::string filename) {

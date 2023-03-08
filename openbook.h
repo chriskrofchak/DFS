@@ -35,7 +35,8 @@ public:
     int OB_open(std::string filename, int cli_fd, uint64_t cli_flags, int ser_fd, uint64_t ser_flags);
     int OB_close(std::string filename);
     fd_pair get_fd_pair(std::string filename);
-    int get_local_fd(std::string filename);
+    int get_local_fd(int fd);
+    int get_local_fd(std::string filename); // only used if *fi not passed
     int get_server_fd(std::string filename);
     void set_cli_fd(std::string filename, int fd);
     std::string get_cache();
