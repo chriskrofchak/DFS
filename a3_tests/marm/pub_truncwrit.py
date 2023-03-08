@@ -16,5 +16,11 @@ res = os.write(fd, bytes("i like everything about you", 'utf-8'))
 # will be less first time if file is empty!
 print(res, "bytes written successfully to", filename_)
 
+print("Now staying open in order to hold RDWR.")
+while True:
+    g = input()
+    if g == 'q':
+        break
+
 os.close(fd)
 print("Closed", filename_, "successfully.")
