@@ -29,12 +29,13 @@ filename_ = mountpath_ + make_filename()
 fd = os.open(filename_, os.O_RDWR|os.O_CREAT)
 print("Opened", filename_, "successfully with fd", fd)
 
+fd = os.write(fd, bytes("wxyzwxyz", "utf-8"))
+
 os.close(fd)
 # SETUP...
 
 fd = os.open(filename_, os.O_RDONLY)
-
-res = os.read(fd, 8)
+res = os.pread(fd, 8, 0)
 print("Successfully read:", res)
 
 print("Stat, to check size:")
