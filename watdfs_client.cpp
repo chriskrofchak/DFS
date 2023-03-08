@@ -285,6 +285,7 @@ int watdfs_cli_release(void *userdata, const char *path,
     CACHE_MUT.lock();
     ob->OB_close(std::string(path));
     CACHE_MUT.unlock();
+    DLOG("MADE IT HERE? (IN CLI_RELEASE)");
     return 0;
 }
 
